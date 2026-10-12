@@ -36,6 +36,7 @@ Single container plus Postgres, with an optional bw-serve sidecar for Bitwarden/
 | vlan | number, 1–4094 |
 | hostname | lowercase string, trailing dot dropped |
 | port | `port[/protocol]` string, 1–65535; protocol `tcp`, `udp`, or `tcp+udp` |
+| asn | number, 1–4294967294 |
 | port_range | `first-last[/protocol]` string, first ≤ last; a range of one is saved as one port |
 | markdown | markdown source string |
 | richtext | sanitized HTML string (sanitize server-side on write) |
@@ -92,6 +93,9 @@ with no server-only imports, so validation (`fields/values.ts`), rendering
   selector, which may stay blank. `src/lib/net/port.ts` reads "443/tcp",
   "tcp 443", "udp:53", "5060:5080 udp", and well-known service names
   ("https" is 443/tcp); the view names the service on a well-known port.
+- **AS number** (`asn`) reads "13335", "AS13335", and asdot ("1.10" is
+  65546) and stores the number; the view writes it "AS13335" and labels
+  private (RFC 6996), documentation (RFC 5398), and reserved numbers.
 - **IP range** (`ip_range`), **VLAN ID** (`vlan`) and **Hostname** (`hostname`)
   validate their shape and nothing more.
 

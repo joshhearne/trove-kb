@@ -177,3 +177,15 @@ describe("ports", () => {
     });
   });
 });
+
+describe("AS numbers", () => {
+  it("writes AS before the number and labels a private one", () => {
+    expect(renderFieldValue(field("asn"), 13335, labels)).toEqual({
+      kind: "asn",
+      text: "AS13335",
+      asn: 13335,
+      note: null,
+    });
+    expect(renderFieldValue(field("asn"), 65001, labels)).toMatchObject({ note: "private" });
+  });
+});

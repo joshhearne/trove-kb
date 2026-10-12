@@ -20,6 +20,7 @@ import {
   parseMac,
   type MacFormat,
 } from "@/lib/net/mac";
+import { parseAsn, type AsnParseError } from "@/lib/net/asn";
 import {
   formatPortSpec,
   MAX_PORT,
@@ -178,6 +179,23 @@ function portSchema(allowRange: boolean) {
   });
 }
 
+const ASN_ERRORS: Record<AsnParseError, string> = {
+  shape: "Enter an AS number such as 13335 or AS13335",
+  number: "An AS number runs from 1 to 4294967294",
+};
+
+/** A 32-bit AS number, saved as a number; "AS13335" and asdot are read too. */
+const asnSchema = z
+  .union([z.string(), z.number()], { error: ASN_ERRORS.shape })
+  .transform((raw, ctx) => {
+    const parsed = parseAsn(String(raw));
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: ASN_ERRORS[parsed.error] });
+      return z.NEVER;
+    }
+    return parsed.value;
+  });
+
 const HOST_LABEL = /^(?!-)[a-z0-9_-]{1,63}(?<!-)$/;
 
 /** A hostname or fully qualified name; lowercased, trailing dot dropped. */
@@ -253,6 +271,8 @@ function baseSchema(field: FieldDefinition, ctx: ValidationContext): z.ZodType {
       return portSchema(false);
     case "port_range":
       return portSchema(true);
+    case "asn":
+      return asnSchema;
     case "boolean":
       return z.boolean();
     case "dropdown":
@@ -422,6 +442,11 @@ export function flattenForSearch(
 
       case "ip_range":
         parts.push(String(value).replace("-", " "));
+        break;
+
+      case "asn":
+        // "AS13335" as well, the way it is usually written.
+        parts.push(String(value), `AS${String(value)}`);
         break;
 
       case "port":

@@ -14,6 +14,7 @@ import {
   type AddressKind,
 } from "@/lib/net/ip";
 import { formatMac, isLocallyAdministered, parseMac, type MacFormat } from "@/lib/net/mac";
+import { asnKind, formatAsn, type AsnKind } from "@/lib/net/asn";
 import { formatPortSpec, parsePortSpec, portCount, serviceName, type Protocol } from "@/lib/net/port";
 import { effectiveMacFormat } from "@/server/fields/values";
 
@@ -59,6 +60,7 @@ export type RenderedValue =
   | { kind: "ip_list"; items: (IpRendered | { kind: "text"; text: string })[] }
   | { kind: "range"; start: string; end: string; size: string }
   | { kind: "mac"; text: string; locallyAdministered: boolean }
+  | { kind: "asn"; text: string; asn: number; note: AsnKind | null }
   | {
       kind: "port";
       /** As stored and sent by the API: "443/tcp", "5060-5080/udp". */
@@ -150,6 +152,12 @@ export function renderFieldValue(
 
     case "hostname":
       return { kind: "code", text: String(value) };
+
+    case "asn": {
+      const asn = Number(value);
+      if (!Number.isInteger(asn)) return { kind: "text", text: String(value) };
+      return { kind: "asn", text: formatAsn(asn), asn, note: asnKind(asn) };
+    }
 
     case "port":
     case "port_range": {

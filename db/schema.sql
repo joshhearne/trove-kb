@@ -875,3 +875,11 @@ ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
 ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
   'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
   'vlan','hostname','port','port_range','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));
+
+-- ---------- AS numbers ----------
+-- A 32-bit autonomous system number, stored as a JSON number.
+ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
+ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
+  'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
+  'vlan','hostname','port','port_range','asn','boolean','dropdown','multi_dropdown','doc_link',
+  'secret_ref'));

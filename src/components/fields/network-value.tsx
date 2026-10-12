@@ -7,6 +7,7 @@ type IpValue = Extract<RenderedValue, { kind: "ip" }>;
 type RangeValue = Extract<RenderedValue, { kind: "range" }>;
 type MacValue = Extract<RenderedValue, { kind: "mac" }>;
 type PortValue = Extract<RenderedValue, { kind: "port" }>;
+type AsnValue = Extract<RenderedValue, { kind: "asn" }>;
 
 const badgeClass =
   "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]";
@@ -115,6 +116,21 @@ export function PortValueView({ value }: { value: PortValue }) {
         value.count && (
           <span className="text-xs text-[var(--muted-foreground)]">{net.portCount(value.count)}</span>
         )
+      )}
+    </span>
+  );
+}
+
+/** "AS13335", with a note when the number is private or reserved. */
+export function AsnValueView({ value }: { value: AsnValue }) {
+  const t = useMessages();
+  return (
+    <span className="flex flex-wrap items-baseline gap-2">
+      <span className="font-mono text-sm">{value.text}</span>
+      {value.note && (
+        <span className="text-xs text-[var(--muted-foreground)]">
+          {t.editor.net.asnNotes[value.note]}
+        </span>
       )}
     </span>
   );

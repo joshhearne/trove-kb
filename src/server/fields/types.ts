@@ -28,6 +28,7 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   hostname: "Hostname",
   port: "Port",
   port_range: "Port range",
+  asn: "AS number",
   boolean: "Yes / no",
   dropdown: "Dropdown",
   multi_dropdown: "Multi-select dropdown",

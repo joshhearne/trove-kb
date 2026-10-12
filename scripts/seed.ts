@@ -153,6 +153,7 @@ const DOC_TYPES: NewDocType[] = [
       { label: "Static IPs", fieldType: "network" },
       { label: "WAN IP", fieldType: "ip" },
       { label: "Gateway", fieldType: "ip" },
+      { label: "ASN", fieldType: "asn" },
       { label: "Speed Down/Up", fieldType: "text" },
       { label: "Account #", fieldType: "text" },
       { label: "Support Notes", fieldType: "markdown" },

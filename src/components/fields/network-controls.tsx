@@ -23,6 +23,7 @@ import {
   splitRangeInput,
   type IpFamily,
 } from "@/lib/net/ip";
+import { asnKind, parseAsn } from "@/lib/net/asn";
 import { macFormatExample, normalizeMac, parseMac, type MacFormat } from "@/lib/net/mac";
 import {
   joinPortStored,
@@ -545,6 +546,62 @@ export function PortControl({
       <p className={hintClass} aria-live="polite">
         {preview ?? (role === "range" ? net.portRangeControlHint : net.portControlHint)}
       </p>
+    </div>
+  );
+}
+
+/**
+ * An AS number. "AS" sits before the box, so a paste or a typed "AS13335"
+ * (or asdot "1.10") is read down to the number.
+ */
+export function AsnControl({
+  id,
+  name,
+  value,
+  onChange,
+  invalid,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  onChange: (next: string) => void;
+  invalid: boolean;
+}) {
+  const t = useMessages();
+  const parsed = parseAsn(value);
+  const note = parsed.ok ? asnKind(parsed.value) : null;
+
+  function absorb(text: string): boolean {
+    const read = parseAsn(text);
+    if (!read.ok || String(read.value) === text.trim()) return false;
+    onChange(String(read.value));
+    return true;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="font-mono text-sm text-[var(--muted-foreground)]">
+          AS
+        </span>
+        <Input
+          id={id}
+          name={name}
+          value={value}
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="13335"
+          onChange={(event) => onChange(event.target.value)}
+          onPaste={(event) => {
+            if (absorb(event.clipboardData.getData("text"))) event.preventDefault();
+          }}
+          onBlur={() => absorb(value)}
+          aria-invalid={invalid}
+          className="w-40 font-mono"
+        />
+      </div>
+      {note && <p className={hintClass}>{t.editor.net.asnNotes[note]}</p>}
     </div>
   );
 }

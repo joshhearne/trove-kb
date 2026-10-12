@@ -76,6 +76,8 @@ function resolve(
       return `${rendered.start}-${rendered.end}`;
     case "port":
       return rendered.value;
+    case "asn":
+      return rendered.text;
     case "url":
       return rendered.href;
     case "html":

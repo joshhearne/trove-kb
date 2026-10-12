@@ -55,6 +55,8 @@ export function NetworkFieldSettings({
       return note(net.portHint);
     case "port_range":
       return note(net.portRangeHint);
+    case "asn":
+      return note(net.asnHint);
     case "mac":
       return (
         <Field id={`${idPrefix}-mac-format`} label={net.macFormat} hint={net.macHint}>

@@ -47,6 +47,8 @@ back in that form in `value`:
 - `port`: `"443/tcp"`, `"53/tcp+udp"`, or `"8443"` with no protocol. A number,
   `"tcp 443"`, or a service name such as `"https"` is accepted.
 - `port_range`: `"5060-5080/udp"`; a range of one port is stored as that port.
+- `asn`: a number from 1 to 4294967294; `"AS13335"` and asdot `"1.10"` are accepted.
+  `resolved` is `"AS13335"`.
 
 ## Company scope
 A key is created with either every company or a named set. Everything below is

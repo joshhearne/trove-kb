@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { RenderedValue } from "@/server/fields/render";
 import {
+  AsnValueView,
   IpRangeView,
   IpValueView,
   MacValueView,
@@ -45,6 +46,9 @@ export function FieldValue({ value }: { value: RenderedValue }) {
 
     case "port":
       return <PortValueView value={value} />;
+
+    case "asn":
+      return <AsnValueView value={value} />;
 
     case "url":
       return (

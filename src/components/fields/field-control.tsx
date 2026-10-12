@@ -10,6 +10,7 @@ import type { FieldType } from "@/server/fields/types";
 import { useMessages } from "@/i18n/client";
 import { Select } from "@/components/ui/select";
 import {
+  AsnControl,
   IpControl,
   IpListControl,
   IpRangeControl,
@@ -249,6 +250,11 @@ export function FieldControl({
             aria-invalid={invalid}
             className="font-mono"
           />
+        );
+
+      case "asn":
+        return (
+          <AsnControl id={id} name={name} value={asText} onChange={onChange} invalid={invalid} />
         );
 
       case "port":

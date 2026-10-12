@@ -15,6 +15,7 @@ import {
   splitAddressList,
   type Cidr,
 } from "@/lib/net/ip";
+import { asnKind, parseAsn } from "@/lib/net/asn";
 import { formatMac, isLocallyAdministered, normalizeMac, parseMac } from "@/lib/net/mac";
 import {
   formatPortSpec,
@@ -239,5 +240,30 @@ describe("ports", () => {
     expect(joinPortStored("443", "", "tcp")).toBe("443/tcp");
     expect(joinPortStored("5060", "5060", "")).toBe("5060");
     expect(joinPortStored("", "", "tcp")).toBe("");
+  });
+});
+
+describe("AS numbers", () => {
+  it("reads plain, prefixed, and asdot spellings", () => {
+    for (const text of ["13335", "AS13335", "as 13335", "ASN: 13335", "13,335"]) {
+      expect(parseAsn(text)).toEqual({ ok: true, value: 13335 });
+    }
+    expect(parseAsn("1.10")).toEqual({ ok: true, value: 65546 });
+    expect(parseAsn("4294967294")).toEqual({ ok: true, value: 4294967294 });
+  });
+
+  it("refuses what is not one", () => {
+    expect(parseAsn("0")).toEqual({ ok: false, error: "number" });
+    expect(parseAsn("4294967295")).toEqual({ ok: false, error: "number" });
+    expect(parseAsn("1.70000")).toEqual({ ok: false, error: "number" });
+    expect(parseAsn("AS-CLOUDFLARE")).toEqual({ ok: false, error: "shape" });
+  });
+
+  it("labels private, documentation, and reserved numbers", () => {
+    expect(asnKind(13335)).toBeNull();
+    expect(asnKind(65001)).toBe("private");
+    expect(asnKind(4200000001)).toBe("private");
+    expect(asnKind(64500)).toBe("documentation");
+    expect(asnKind(23456)).toBe("reserved");
   });
 });

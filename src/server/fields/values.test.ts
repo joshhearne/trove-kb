@@ -344,3 +344,17 @@ describe("ports", () => {
     expect(text.split(" ")).toEqual(expect.arrayContaining(["443", "tcp", "HTTPS"]));
   });
 });
+
+describe("AS numbers", () => {
+  it("saves the number however it is written", () => {
+    expect(value("asn", "AS13335")).toEqual({ ok: true, value: 13335 });
+    expect(value("asn", 65001)).toEqual({ ok: true, value: 65001 });
+    expect(value("asn", "0").ok).toBe(false);
+  });
+
+  it("indexes it with and without AS", () => {
+    const asn = field("asn");
+    const text = flattenForSearch([asn], { [asn.id]: 13335 });
+    expect(text.split(" ")).toEqual(expect.arrayContaining(["13335", "AS13335"]));
+  });
+});

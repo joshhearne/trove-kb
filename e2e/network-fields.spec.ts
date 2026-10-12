@@ -30,6 +30,7 @@ test.beforeAll(async ({ browser }) => {
     { label: "DNS Servers", type: "ip_list" },
     { label: "VPN", type: "port" },
     { label: "RTP", type: "port_range" },
+    { label: "Upstream ASN", type: "asn" },
   ]);
 
   // A MAC field with a format of its own, chosen as it is created.
@@ -238,4 +239,23 @@ test("refuses a range in a single port field", async ({ page }) => {
   await page.getByRole("textbox", { name: "VPN port" }).fill("500-4500");
   await page.getByRole("button", { name: "Save document" }).click();
   await expect(page.getByText("Use a Port range field for several")).toBeVisible();
+});
+
+test("saves an AS number pasted with its prefix", async ({ page }) => {
+  await page.goto(editUrl);
+  const asn = page.getByRole("textbox", { name: "Upstream ASN" });
+  await asn.focus();
+  await asn.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "AS65001");
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(asn).toHaveValue("65001");
+  await expect(page.getByText("Private AS number")).toBeVisible();
+
+  await page.getByRole("button", { name: "Save document" }).click();
+  await expect(page).toHaveURL(viewUrl);
+  const row = page.locator("dl > div").filter({ has: page.getByText("Upstream ASN", { exact: true }) });
+  await expect(row).toContainText("AS65001");
+  await expect(row).toContainText("Private AS number");
 });

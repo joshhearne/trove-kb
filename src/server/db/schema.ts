@@ -443,6 +443,7 @@ export const FIELD_TYPES = [
   "hostname",
   "port",
   "port_range",
+  "asn",
   "boolean",
   "dropdown",
   "multi_dropdown",
@@ -496,7 +497,7 @@ export const fields = pgTable(
     ),
     check(
       "fields_field_type_check",
-      sql`${t.fieldType} IN ('text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac','vlan','hostname','port','port_range','boolean','dropdown','multi_dropdown','doc_link','secret_ref')`,
+      sql`${t.fieldType} IN ('text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac','vlan','hostname','port','port_range','asn','boolean','dropdown','multi_dropdown','doc_link','secret_ref')`,
     ),
     check(
       "fields_owner_check",
