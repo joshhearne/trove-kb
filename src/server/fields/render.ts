@@ -52,6 +52,20 @@ export type IpRendered = {
   block: RenderedBlock | null;
 };
 
+/** A port or a range of them, worked out. */
+export type PortRendered = {
+  kind: "port";
+  /** As stored and sent by the API: "443/tcp", "5060-5080/udp". */
+  value: string;
+  /** "443" or "5060–5080", without the protocol. */
+  ports: string;
+  protocol: Protocol | null;
+  /** The well-known service on a single port, such as HTTPS. */
+  service: string | null;
+  /** How many ports a range covers; null for one port. */
+  count: string | null;
+};
+
 export type RenderedValue =
   | { kind: "empty" }
   | { kind: "code"; text: string }
@@ -61,18 +75,9 @@ export type RenderedValue =
   | { kind: "range"; start: string; end: string; size: string }
   | { kind: "mac"; text: string; locallyAdministered: boolean }
   | { kind: "asn"; text: string; asn: number; note: AsnKind | null }
-  | {
-      kind: "port";
-      /** As stored and sent by the API: "443/tcp", "5060-5080/udp". */
-      value: string;
-      /** "443" or "5060–5080", without the protocol. */
-      ports: string;
-      protocol: Protocol | null;
-      /** The well-known service on a single port, such as HTTPS. */
-      service: string | null;
-      /** How many ports a range covers; null for one port. */
-      count: string | null;
-    }
+  | PortRendered
+  /** Several ports or ranges in order; one that no longer parses shows as text. */
+  | { kind: "port_list"; items: (PortRendered | { kind: "text"; text: string })[] }
   | { kind: "text"; text: string }
   | { kind: "url"; href: string }
   | { kind: "html"; html: string }
@@ -160,19 +165,12 @@ export function renderFieldValue(
     }
 
     case "port":
-    case "port_range": {
-      const parsed = parsePortSpec(String(value), true);
-      if (!parsed.ok) return { kind: "text", text: String(value) };
-      const spec = parsed.value;
-      const single = spec.start === spec.end;
-      return {
-        kind: "port",
-        value: formatPortSpec(spec),
-        ports: single ? String(spec.start) : `${spec.start}–${spec.end}`,
-        protocol: spec.protocol,
-        service: single ? serviceName(spec.start) : null,
-        count: single ? null : formatCount(BigInt(portCount(spec)), locale),
-      };
+    case "port_range":
+      return renderPort(String(value), locale);
+
+    case "port_list": {
+      if (!Array.isArray(value) || value.length === 0) return { kind: "empty" };
+      return { kind: "port_list", items: value.map((item) => renderPort(String(item), locale)) };
     }
 
     case "vlan":
@@ -252,5 +250,21 @@ function renderIp(
       usable: formatCount(block.usable, locale),
       total: formatCount(block.total, locale),
     },
+  };
+}
+
+/** A port or a range, with its service or its count. */
+function renderPort(value: string, locale: Locale): PortRendered | { kind: "text"; text: string } {
+  const parsed = parsePortSpec(value, true);
+  if (!parsed.ok) return { kind: "text", text: value };
+  const spec = parsed.value;
+  const single = spec.start === spec.end;
+  return {
+    kind: "port",
+    value: formatPortSpec(spec),
+    ports: single ? String(spec.start) : `${spec.start}–${spec.end}`,
+    protocol: spec.protocol,
+    service: single ? serviceName(spec.start) : null,
+    count: single ? null : formatCount(BigInt(portCount(spec)), locale),
   };
 }

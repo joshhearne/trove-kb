@@ -358,3 +358,33 @@ describe("AS numbers", () => {
     expect(text.split(" ")).toEqual(expect.arrayContaining(["13335", "AS13335"]));
   });
 });
+
+describe("port lists", () => {
+  it("keeps the order and saves each entry as a port range field does", () => {
+    expect(value("port_list", ["TCP 443", 80, "5060:5080 udp", "10000-10000/udp"])).toEqual({
+      ok: true,
+      value: ["443/tcp", "80", "5060-5080/udp", "10000/udp"],
+    });
+  });
+
+  it("splits a string the way a paste is split", () => {
+    expect(value("port_list", "80 tcp, 443/tcp; 53 tcp/udp")).toEqual({
+      ok: true,
+      value: ["80/tcp", "443/tcp", "53/tcp+udp"],
+    });
+  });
+
+  it("names the entry that is wrong, and refuses a repeat", () => {
+    const bad = value("port_list", ["443", "70000"]);
+    expect(bad.ok === false && bad.message).toContain("Entry 2 (70000)");
+    const repeat = value("port_list", ["443/tcp", "tcp 443"]);
+    expect(repeat.ok === false && repeat.message).toContain("listed twice");
+    expect(value("port_list", [])).toEqual({ ok: true, value: null });
+  });
+
+  it("indexes each entry's number and service", () => {
+    const list = field("port_list");
+    const text = flattenForSearch([list], { [list.id]: ["3389/tcp", "5060-5080/udp"] });
+    expect(text.split(" ")).toEqual(expect.arrayContaining(["3389", "RDP", "5060", "5080", "udp"]));
+  });
+});

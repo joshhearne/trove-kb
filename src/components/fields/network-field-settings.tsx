@@ -55,6 +55,8 @@ export function NetworkFieldSettings({
       return note(net.portHint);
     case "port_range":
       return note(net.portRangeHint);
+    case "port_list":
+      return note(net.portListHint);
     case "asn":
       return note(net.asnHint);
     case "mac":

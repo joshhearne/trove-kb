@@ -47,6 +47,9 @@ back in that form in `value`:
 - `port`: `"443/tcp"`, `"53/tcp+udp"`, or `"8443"` with no protocol. A number,
   `"tcp 443"`, or a service name such as `"https"` is accepted.
 - `port_range`: `"5060-5080/udp"`; a range of one port is stored as that port.
+- `port_list`: `["80/tcp", "443/tcp", "5060-5080/udp"]`, in order; each entry as
+  `port_range` takes it. A single string is split on commas, semicolons, new lines,
+  and spaces, keeping a protocol with its number.
 - `asn`: a number from 1 to 4294967294; `"AS13335"` and asdot `"1.10"` are accepted.
   `resolved` is `"AS13335"`.
 

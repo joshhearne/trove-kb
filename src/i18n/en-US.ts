@@ -581,6 +581,8 @@ export const enUS = {
         "A short name such as fw01, or a fully qualified one such as fw01.example.com. Saved in lowercase.",
       portHint:
         "One port from 1 to 65535, with a protocol selector beside it (TCP, UDP, or both; it may be left blank). Pasting 443/tcp fills both, and a known service name such as https is read as its port.",
+      portListHint:
+        "Several ports or ranges in order, such as what a firewall rule opens. Each row has a first and a last port (leave the last blank for one port) and its own protocol. Pasting a list such as 80, 443/tcp, 5060-5080/udp fills a row for each.",
       asnHint:
         "An autonomous system number, such as an ISP's. Type 13335 or paste AS13335; it is saved as the number and shown as AS13335. Private and documentation numbers are labeled as such.",
       portRangeHint:
@@ -613,6 +615,7 @@ export const enUS = {
       savedAs: (text: string) => `Saved as ${text}.`,
       listEntry: (label: string, n: number) => `${label} ${n}`,
       addAddress: "Add address",
+      addPort: "Add port",
       moveUp: (entry: string) => `Move ${entry} up`,
       moveDown: (entry: string) => `Move ${entry} down`,
       remove: (entry: string) => `Remove ${entry}`,

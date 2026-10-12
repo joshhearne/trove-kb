@@ -26,6 +26,7 @@ import {
   MAX_PORT,
   parsePortSpec,
   serviceName,
+  splitPortList,
   type PortParseError,
 } from "@/lib/net/port";
 
@@ -179,6 +180,44 @@ function portSchema(allowRange: boolean) {
   });
 }
 
+const MAX_PORT_LIST = 64;
+
+/**
+ * Several ports or ranges, such as what a firewall rule opens: each one as a
+ * port_range field stores it, in order. A string is split the way a paste is.
+ */
+const portListSchema = z
+  .union([z.string().transform(splitPortList), z.array(z.union([z.string(), z.number()]))], {
+    error: "Enter ports",
+  })
+  .transform((items) => items.map((item) => String(item).trim()).filter((item) => item !== ""))
+  .transform((items, ctx) => {
+    if (items.length > MAX_PORT_LIST) {
+      ctx.addIssue({ code: "custom", message: `List at most ${MAX_PORT_LIST} ports or ranges` });
+      return z.NEVER;
+    }
+    const out: string[] = [];
+    for (const [index, item] of items.entries()) {
+      const parsed = parsePortSpec(item, true);
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Entry ${index + 1} (${item}): ${
+            parsed.error === "shape" ? "Enter a port such as 443/tcp or a range such as 5060-5080/udp" : PORT_ERRORS[parsed.error]
+          }`,
+        });
+        return z.NEVER;
+      }
+      const normalized = formatPortSpec(parsed.value);
+      if (out.includes(normalized)) {
+        ctx.addIssue({ code: "custom", message: `${item} is listed twice` });
+        return z.NEVER;
+      }
+      out.push(normalized);
+    }
+    return out;
+  });
+
 const ASN_ERRORS: Record<AsnParseError, string> = {
   shape: "Enter an AS number such as 13335 or AS13335",
   number: "An AS number runs from 1 to 4294967294",
@@ -271,6 +310,8 @@ function baseSchema(field: FieldDefinition, ctx: ValidationContext): z.ZodType {
       return portSchema(false);
     case "port_range":
       return portSchema(true);
+    case "port_list":
+      return portListSchema;
     case "asn":
       return asnSchema;
     case "boolean":
@@ -450,21 +491,13 @@ export function flattenForSearch(
         break;
 
       case "port":
-      case "port_range": {
-        // Each number on its own, the protocol, and the service's name.
-        const parsed = parsePortSpec(String(value), true);
-        if (!parsed.ok) {
-          parts.push(String(value));
-          break;
-        }
-        const { start, end, protocol } = parsed.value;
-        parts.push(String(start));
-        if (end !== start) parts.push(String(end));
-        if (protocol) parts.push(...protocol.split("+"));
-        const service = start === end ? serviceName(start) : null;
-        if (service) parts.push(service);
+      case "port_range":
+        pushPortTerms(parts, String(value));
         break;
-      }
+
+      case "port_list":
+        if (Array.isArray(value)) for (const item of value) pushPortTerms(parts, String(item));
+        break;
 
       case "mac": {
         // Every common spelling finds it, since the search parser splits each
@@ -499,3 +532,18 @@ export function flattenForSearch(
 }
 
 export type { FieldType };
+
+/** A port's search terms: each number, the protocol, and the service's name. */
+function pushPortTerms(parts: string[], value: string): void {
+  const parsed = parsePortSpec(value, true);
+  if (!parsed.ok) {
+    parts.push(value);
+    return;
+  }
+  const { start, end, protocol } = parsed.value;
+  parts.push(String(start));
+  if (end !== start) parts.push(String(end));
+  if (protocol) parts.push(...protocol.split("+"));
+  const service = start === end ? serviceName(start) : null;
+  if (service) parts.push(service);
+}

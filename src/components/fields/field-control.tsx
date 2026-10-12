@@ -16,6 +16,7 @@ import {
   IpRangeControl,
   MacControl,
   PortControl,
+  PortListControl,
 } from "@/components/fields/network-controls";
 import type { MacFormat } from "@/lib/net/mac";
 
@@ -44,7 +45,7 @@ export function inputName(fieldId: string): string {
 /** Turns a stored value into what the control should start with. */
 export function toFormValue(fieldType: FieldType, stored: unknown): FieldFormValue {
   if (fieldType === "boolean") return stored === true;
-  if (fieldType === "multi_dropdown" || fieldType === "ip_list") {
+  if (fieldType === "multi_dropdown" || fieldType === "ip_list" || fieldType === "port_list") {
     return Array.isArray(stored) ? stored.map(String) : [];
   }
   if (fieldType === "secret_ref") {
@@ -249,6 +250,18 @@ export function FieldControl({
             onBlur={(event) => onChange(event.target.value.trim().toLowerCase())}
             aria-invalid={invalid}
             className="font-mono"
+          />
+        );
+
+      case "port_list":
+        return (
+          <PortListControl
+            id={id}
+            name={name}
+            label={field.label}
+            value={selected}
+            onChange={onChange}
+            invalid={invalid}
           />
         );
 

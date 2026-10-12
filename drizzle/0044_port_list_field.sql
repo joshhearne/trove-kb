@@ -1,0 +1,2 @@
+ALTER TABLE "fields" DROP CONSTRAINT "fields_field_type_check";--> statement-breakpoint
+ALTER TABLE "fields" ADD CONSTRAINT "fields_field_type_check" CHECK ("fields"."field_type" IN ('text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac','vlan','hostname','port','port_range','port_list','asn','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));

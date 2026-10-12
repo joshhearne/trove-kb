@@ -50,6 +50,21 @@ export function FieldValue({ value }: { value: RenderedValue }) {
     case "asn":
       return <AsnValueView value={value} />;
 
+    case "port_list":
+      return (
+        <ul className="flex flex-col gap-1">
+          {value.items.map((item, index) => (
+            <li key={index}>
+              {item.kind === "port" ? (
+                <PortValueView value={item} />
+              ) : (
+                <span className="text-sm">{item.text}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      );
+
     case "url":
       return (
         <a

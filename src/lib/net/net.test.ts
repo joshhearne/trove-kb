@@ -23,6 +23,7 @@ import {
   parsePortSpec,
   portCount,
   serviceName,
+  splitPortList,
   splitPortStored,
 } from "@/lib/net/port";
 
@@ -265,5 +266,18 @@ describe("AS numbers", () => {
     expect(asnKind(4200000001)).toBe("private");
     expect(asnKind(64500)).toBe("documentation");
     expect(asnKind(23456)).toBe("reserved");
+  });
+});
+
+describe("splitPortList", () => {
+  it("splits on commas, new lines, and spaces, keeping a protocol with its number", () => {
+    expect(splitPortList("80, 443\n8080")).toEqual(["80", "443", "8080"]);
+    expect(splitPortList("80 443/tcp")).toEqual(["80", "443/tcp"]);
+    expect(splitPortList("tcp 80, udp 53")).toEqual(["tcp 80", "udp 53"]);
+    expect(splitPortList("80 tcp 53 udp")).toEqual(["80/tcp", "53/udp"]);
+    expect(splitPortList("5060 - 5080/udp 10000-20000 udp")).toEqual([
+      "5060-5080/udp",
+      "10000-20000/udp",
+    ]);
   });
 });

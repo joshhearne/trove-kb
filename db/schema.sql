@@ -883,3 +883,12 @@ ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
   'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
   'vlan','hostname','port','port_range','asn','boolean','dropdown','multi_dropdown','doc_link',
   'secret_ref'));
+
+-- ---------- Port lists ----------
+-- Several ports or ranges in order: a JSON array of the strings a
+-- port_range field stores.
+ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
+ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
+  'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
+  'vlan','hostname','port','port_range','port_list','asn','boolean','dropdown','multi_dropdown',
+  'doc_link','secret_ref'));

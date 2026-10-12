@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ClipboardEvent } from "react";
+import { useState, type ClipboardEvent, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import {
   portCount,
   PROTOCOLS,
   serviceName,
+  splitPortList,
   splitPortStored,
 } from "@/lib/net/port";
 
@@ -210,24 +211,35 @@ export function IpControl({
   }
 }
 
-/** Row keys for IpListControl: unique for the page's life, never reused. */
+/** Row keys for the list controls: unique for the page's life, never reused. */
 let listRowKey = 0;
 function row(text: string): { key: number; text: string } {
   return { key: listRowKey++, text };
 }
 
+type ListRow = {
+  id: string;
+  label: string;
+  value: string;
+  invalid: boolean;
+  onChange: (text: string) => void;
+  onPasteList: (entries: string[]) => void;
+};
+
 /**
- * Several addresses in order, such as DNS servers, primary first. Each row
- * works like an IP address field; a paste of several addresses fills a row
- * for each. The form posts one value per address, empty rows left out.
+ * Rows in order, each its own control, with up, down, and remove, and a
+ * paste of several entries filling a row for each. The form posts one value
+ * per row, empty rows left out.
  */
-export function IpListControl({
+function OrderedListControl({
   id,
   name,
   label,
   value,
   onChange,
   invalid,
+  addLabel,
+  renderRow,
 }: {
   id: string;
   name: string;
@@ -235,6 +247,8 @@ export function IpListControl({
   value: string[];
   onChange: (next: string[]) => void;
   invalid: boolean;
+  addLabel: string;
+  renderRow: (row: ListRow) => ReactNode;
 }) {
   const t = useMessages();
   const [rows, setRows] = useState(() => (value.length === 0 ? [row("")] : value.map(row)));
@@ -265,23 +279,20 @@ export function IpListControl({
           return (
             <li key={r.key} className="flex items-start gap-1">
               <div className="min-w-0 flex-1">
-                <IpControl
-                  id={index === 0 ? id : `${id}-${r.key}`}
-                  label={entry}
-                  role="ip"
-                  value={r.text}
-                  invalid={invalid}
-                  onChange={(text) =>
-                    update(rows.map((other) => (other.key === r.key ? { ...other, text } : other)))
-                  }
-                  onPasteList={(addresses) =>
+                {renderRow({
+                  id: index === 0 ? id : `${id}-${r.key}`,
+                  label: entry,
+                  value: r.text,
+                  invalid,
+                  onChange: (text) =>
+                    update(rows.map((other) => (other.key === r.key ? { ...other, text } : other))),
+                  onPasteList: (entries) =>
                     update([
                       ...rows.slice(0, index),
-                      ...addresses.map(row),
+                      ...entries.map(row),
                       ...rows.slice(index + 1).filter((other) => other.text.trim() !== ""),
-                    ])
-                  }
-                />
+                    ]),
+                })}
               </div>
               <Button
                 type="button"
@@ -324,10 +335,49 @@ export function IpListControl({
           onClick={() => setRows([...rows, row("")])}
         >
           <Plus className="size-4" aria-hidden />
-          {t.editor.net.addAddress}
+          {addLabel}
         </Button>
       </div>
     </div>
+  );
+}
+
+type ListControlProps = {
+  id: string;
+  name: string;
+  label: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  invalid: boolean;
+};
+
+/**
+ * Several addresses in order, such as DNS servers, primary first. Each row
+ * works like an IP address field.
+ */
+export function IpListControl(props: ListControlProps) {
+  const t = useMessages();
+  return (
+    <OrderedListControl
+      {...props}
+      addLabel={t.editor.net.addAddress}
+      renderRow={(r) => <IpControl {...r} role="ip" />}
+    />
+  );
+}
+
+/**
+ * Several ports or ranges in order, such as what a firewall rule opens. Each
+ * row works like a Port range field, with its own protocol.
+ */
+export function PortListControl(props: ListControlProps) {
+  const t = useMessages();
+  return (
+    <OrderedListControl
+      {...props}
+      addLabel={t.editor.net.addPort}
+      renderRow={(r) => <PortControl {...r} role="range" />}
+    />
   );
 }
 
@@ -433,14 +483,18 @@ export function PortControl({
   value,
   onChange,
   invalid,
+  onPasteList,
 }: {
   id: string;
-  name: string;
+  /** Omitted when a list posts the value instead. */
+  name?: string;
   label: string;
   role: "port" | "range";
   value: string;
   onChange: (next: string) => void;
   invalid: boolean;
+  /** In a list, a paste of several ports goes to the list. */
+  onPasteList?: (entries: string[]) => void;
 }) {
   const t = useMessages();
   const locale = useLocale();
@@ -470,7 +524,16 @@ export function PortControl({
 
   /** "443/tcp", "tcp 443", "5060-5080/udp", or "https" fills every control. */
   function onPaste(event: ClipboardEvent<HTMLInputElement>) {
-    const parsed = parsePortSpec(event.clipboardData.getData("text"), role === "range");
+    const text = event.clipboardData.getData("text");
+    if (onPasteList) {
+      const entries = splitPortList(text);
+      if (entries.length > 1) {
+        event.preventDefault();
+        onPasteList(entries);
+        return;
+      }
+    }
+    const parsed = parsePortSpec(text, role === "range");
     if (!parsed.ok) return;
     event.preventDefault();
     const spec = parsed.value;
@@ -504,7 +567,7 @@ export function PortControl({
 
   return (
     <div className="flex flex-col gap-1">
-      <input type="hidden" name={name} value={joinPortStored(start, end, protocol)} />
+      {name && <input type="hidden" name={name} value={joinPortStored(start, end, protocol)} />}
       <div className="flex flex-wrap items-center gap-2">
         <Input
           id={id}

@@ -31,6 +31,7 @@ test.beforeAll(async ({ browser }) => {
     { label: "VPN", type: "port" },
     { label: "RTP", type: "port_range" },
     { label: "Upstream ASN", type: "asn" },
+    { label: "Open Ports", type: "port_list" },
   ]);
 
   // A MAC field with a format of its own, chosen as it is created.
@@ -258,4 +259,40 @@ test("saves an AS number pasted with its prefix", async ({ page }) => {
   const row = page.locator("dl > div").filter({ has: page.getByText("Upstream ASN", { exact: true }) });
   await expect(row).toContainText("AS65001");
   await expect(row).toContainText("Private AS number");
+});
+
+test("keeps a port list in order, filled from one paste", async ({ page }) => {
+  await page.goto(editUrl);
+
+  const first = page.getByRole("textbox", { name: "Open Ports 1, first port" });
+  await first.focus();
+  await first.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "443/tcp, 80 tcp\n5060-5080/udp");
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(page.getByRole("textbox", { name: "Open Ports 3, first port" })).toHaveValue("5060");
+  await expect(page.getByRole("textbox", { name: "Open Ports 3, last port" })).toHaveValue("5080");
+  await expect(page.getByRole("combobox", { name: "Open Ports 3 protocol" })).toHaveValue("udp");
+
+  await page.getByRole("button", { name: "Move Open Ports 2 up" }).click();
+  await expect(first).toHaveValue("80");
+
+  await page.getByRole("button", { name: "Add port" }).click();
+  await page.getByRole("textbox", { name: "Open Ports 4, first port" }).fill("3389");
+
+  await page.getByRole("button", { name: "Save document" }).click();
+  await expect(page).toHaveURL(viewUrl);
+
+  const items = page
+    .locator("dl > div")
+    .filter({ has: page.getByText("Open Ports", { exact: true }) })
+    .getByRole("listitem");
+  await expect(items).toHaveCount(4);
+  await expect(items.nth(0)).toContainText("80");
+  await expect(items.nth(0)).toContainText("HTTP");
+  await expect(items.nth(1)).toContainText("443");
+  await expect(items.nth(2)).toContainText("5060–5080");
+  await expect(items.nth(2)).toContainText("21 ports");
+  await expect(items.nth(3)).toContainText("RDP");
 });

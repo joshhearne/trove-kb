@@ -140,6 +140,12 @@ export function portCount(spec: PortSpec): number {
 
 /** For the controls: the ports and the protocol, kept apart. */
 export function splitPortStored(value: string): { start: string; end: string; protocol: string } {
+  // Any spelling a paste may hand over ("80 tcp", "https") is read first.
+  const parsed = parsePortSpec(value, true);
+  if (parsed.ok) {
+    const { start, end, protocol } = parsed.value;
+    return { start: String(start), end: end === start ? "" : String(end), protocol: protocol ?? "" };
+  }
   const [ports = "", protocol = ""] = value.split("/");
   const [start = "", end = ""] = ports.split("-");
   return { start, end, protocol: (PROTOCOLS as readonly string[]).includes(protocol) ? protocol : "" };
@@ -151,4 +157,46 @@ export function joinPortStored(start: string, end: string, protocol: string): st
   if (a === "" && b === "") return "";
   const ports = b === "" || b === a ? a : `${a}-${b}`;
   return protocol === "" ? ports : `${ports}/${protocol}`;
+}
+
+const PROTOCOL_TOKEN = /^(?:tcp|udp|both|tcp\/udp|udp\/tcp|tcp\+udp|udp\+tcp)$/i;
+
+/**
+ * Splits a pasted list of ports: commas, semicolons, new lines, and spaces
+ * between entries. A protocol written apart from its number stays with it,
+ * so "80 443/tcp", "tcp 80, udp 53", and "80 tcp 53 udp" each read as two
+ * entries. What does not parse is kept as written, for the error to name.
+ */
+export function splitPortList(text: string): string[] {
+  const out: string[] = [];
+  for (const piece of text.split(/[,;\n\r]+/)) {
+    const trimmed = piece.trim();
+    if (trimmed === "") continue;
+    if (parsePortSpec(trimmed, true).ok) {
+      out.push(trimmed);
+      continue;
+    }
+    // Join "5060 - 5080" back into one token before splitting on spaces.
+    const tokens = trimmed.replace(/\s*(?:-|–|—)\s*/g, "-").split(/\s+/);
+    const entries: string[] = [];
+    let pending: string | null = null;
+    for (const token of tokens) {
+      if (PROTOCOL_TOKEN.test(token)) {
+        const last = entries.length - 1;
+        // After a number that has no protocol yet, it belongs to that number;
+        // otherwise it waits for the next one.
+        if (pending === null && last >= 0 && !/[a-z]/i.test(entries[last]!)) {
+          entries[last] = `${entries[last]}/${token}`;
+        } else {
+          pending = token;
+        }
+      } else {
+        entries.push(pending ? `${token}/${pending}` : token);
+        pending = null;
+      }
+    }
+    if (pending) entries.push(pending);
+    out.push(...entries);
+  }
+  return out;
 }

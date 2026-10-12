@@ -189,3 +189,13 @@ describe("AS numbers", () => {
     expect(renderFieldValue(field("asn"), 65001, labels)).toMatchObject({ note: "private" });
   });
 });
+
+describe("port lists", () => {
+  it("renders each entry, keeping one that no longer parses as text", () => {
+    expect(renderFieldValue(field("port_list"), ["443/tcp", "nonsense"], labels)).toMatchObject({
+      kind: "port_list",
+      items: [{ kind: "port", ports: "443", service: "HTTPS" }, { kind: "text", text: "nonsense" }],
+    });
+    expect(renderFieldValue(field("port_list"), [], labels)).toEqual({ kind: "empty" });
+  });
+});

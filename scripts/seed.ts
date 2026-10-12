@@ -230,6 +230,7 @@ const DOC_TYPES: NewDocType[] = [
       { label: "OS", fieldType: "dropdown", optionList: "Server Operating Systems" },
       { label: "IP", fieldType: "ip" },
       { label: "MAC", fieldType: "mac" },
+      { label: "Open Ports", fieldType: "port_list" },
       { label: "Host/Hypervisor", fieldType: "text" },
       { label: "Backup Notes", fieldType: "markdown" },
     ],

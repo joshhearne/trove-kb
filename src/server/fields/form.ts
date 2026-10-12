@@ -30,6 +30,7 @@ export function readRawValue(formData: FormData, field: FieldDefinition): unknow
 
     case "multi_dropdown":
     case "ip_list":
+    case "port_list":
       return formData.getAll(key).filter((v): v is string => typeof v === "string" && v !== "");
 
 

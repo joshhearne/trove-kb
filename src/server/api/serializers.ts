@@ -76,6 +76,8 @@ function resolve(
       return `${rendered.start}-${rendered.end}`;
     case "port":
       return rendered.value;
+    case "port_list":
+      return rendered.items.map((item) => (item.kind === "port" ? item.value : item.text));
     case "asn":
       return rendered.text;
     case "url":
