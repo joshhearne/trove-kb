@@ -1,5 +1,8 @@
 "use server";
 
+import { effectiveMacFormat } from "@/server/fields/values";
+import { getMacFormat } from "@/server/services/settings";
+import type { MacFormat } from "@/lib/net/mac";
 import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { toFieldErrors } from "@/lib/form";
@@ -40,10 +43,12 @@ export type InlineFieldPayload = {
   optionListId: string | null;
   linkDocTypeId: string | null;
   required: boolean;
+  /** The format in force for a mac field: its own, else the instance's. */
+  macFormat: MacFormat;
   isLocal: boolean;
 };
 
-function toPayload(field: FieldDefinition): InlineFieldPayload {
+async function toPayload(field: FieldDefinition): Promise<InlineFieldPayload> {
   return {
     id: field.id,
     label: field.label,
@@ -51,6 +56,7 @@ function toPayload(field: FieldDefinition): InlineFieldPayload {
     optionListId: field.optionListId,
     linkDocTypeId: field.linkDocTypeId,
     required: field.required,
+    macFormat: effectiveMacFormat(field, await getMacFormat()),
     isLocal: field.documentId !== null,
   };
 }
@@ -76,6 +82,8 @@ export type FieldDraft = {
   fieldType: EditableFieldType;
   optionListId: string | null;
   linkDocTypeId: string | null;
+  /** mac only: a format of the field's own; null follows the instance. */
+  macFormat: MacFormat | null;
   required: boolean;
 };
 
@@ -88,7 +96,7 @@ export async function addLocalFieldAction(
     const user = await editor();
     const field = await addLocalField(documentId, draft, user.id, await getCompanyScope(user));
     revalidatePath(`/documents/${documentId}`);
-    return { ok: true, data: toPayload(field) };
+    return { ok: true, data: await toPayload(field) };
   } catch (err) {
     return toError(err);
   }
@@ -104,7 +112,7 @@ export async function promoteFieldAction(
     const user = await editor();
     const field = await promoteField(fieldId, draft, user.id, await getCompanyScope(user));
     revalidatePath(`/documents/${documentId}`);
-    return { ok: true, data: toPayload(field) };
+    return { ok: true, data: await toPayload(field) };
   } catch (err) {
     return toError(err);
   }

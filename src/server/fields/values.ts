@@ -1,6 +1,24 @@
 import { z } from "zod";
 import { sanitizeRichText, htmlToText } from "@/server/fields/sanitize";
 import type { FieldDefinition, FieldType } from "@/server/fields/types";
+import {
+  formatAddress,
+  formatCidr,
+  formatRange,
+  maxPrefix,
+  networkOf,
+  parseCidr,
+  parseRange,
+  type CidrParseError,
+  type RangeParseError,
+} from "@/lib/net/ip";
+import {
+  DEFAULT_MAC_FORMAT,
+  formatMac,
+  isMacFormat,
+  parseMac,
+  type MacFormat,
+} from "@/lib/net/mac";
 
 /** Option items available to a dropdown field, keyed by option list id. */
 export type OptionIndex = Map<string, { id: string; label: string }[]>;
@@ -20,7 +38,92 @@ export type ValidationContext = {
   options?: OptionIndex;
   linkTargets?: LinkTargetIndex;
   secretItems?: SecretItemIndex;
+  /** The instance's MAC format, for mac fields that name none of their own. */
+  macFormat?: MacFormat;
 };
+
+/** The format a mac field writes in: its own, else the instance's. */
+export function effectiveMacFormat(
+  field: Pick<FieldDefinition, "macFormat">,
+  instanceFormat: MacFormat | undefined,
+): MacFormat {
+  if (isMacFormat(field.macFormat)) return field.macFormat;
+  return instanceFormat ?? DEFAULT_MAC_FORMAT;
+}
+
+const CIDR_ERRORS: Record<CidrParseError | "missing", string> = {
+  address: "Enter an IPv4 or IPv6 address",
+  prefix: "Choose a prefix from /0 to /32 (IPv4) or /0 to /128 (IPv6)",
+  mixed: "Enter one address with one /prefix",
+  missing: "Choose the network's prefix, such as /24",
+};
+
+const RANGE_ERRORS: Record<RangeParseError, string> = {
+  shape: "Enter a range as first-last, such as 192.168.1.100-192.168.1.199",
+  start: "The first address of the range is not an IP address",
+  end: "The last address of the range is not an IP address",
+  family: "Both ends of a range must be IPv4, or both IPv6",
+  order: "The range ends before it starts",
+};
+
+/** One host address. A missing prefix means the address alone: /32, or /128. */
+const ipSchema = z.string().transform((text, ctx) => {
+  const parsed = parseCidr(text, "host");
+  if (!parsed.ok) {
+    ctx.addIssue({ code: "custom", message: CIDR_ERRORS[parsed.error] });
+    return z.NEVER;
+  }
+  return formatCidr(parsed.value);
+});
+
+/**
+ * A block of addresses. The prefix is required and stops short of a single
+ * address; host bits are cleared, so 192.168.1.77/24 is kept as 192.168.1.0/24.
+ */
+const networkSchema = z.string().transform((text, ctx) => {
+  const parsed = parseCidr(text, null);
+  if (!parsed.ok) {
+    ctx.addIssue({ code: "custom", message: CIDR_ERRORS[parsed.error] });
+    return z.NEVER;
+  }
+  const { address, prefix } = parsed.value;
+  if (prefix === maxPrefix(address.family)) {
+    ctx.addIssue({
+      code: "custom",
+      message: `A /${prefix} is a single address. Use an IP address field, or choose a wider prefix`,
+    });
+    return z.NEVER;
+  }
+  return `${formatAddress(networkOf(parsed.value))}/${prefix}`;
+});
+
+const ipRangeSchema = z.string().transform((text, ctx) => {
+  const parsed = parseRange(text);
+  if (!parsed.ok) {
+    ctx.addIssue({ code: "custom", message: RANGE_ERRORS[parsed.error] });
+    return z.NEVER;
+  }
+  return formatRange(parsed.value);
+});
+
+const HOST_LABEL = /^(?!-)[a-z0-9_-]{1,63}(?<!-)$/;
+
+/** A hostname or fully qualified name; lowercased, trailing dot dropped. */
+const hostnameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((name) => name.replace(/\.$/, ""))
+  .refine(
+    (name) => name.length <= 253 && name.split(".").every((label) => HOST_LABEL.test(label)),
+    "Enter a hostname such as fw01 or fw01.example.com: letters, digits, and hyphens, dot-separated",
+  );
+
+const vlanSchema = z.coerce
+  .number({ error: "Enter a VLAN ID" })
+  .int("A VLAN ID is a whole number")
+  .min(1, "A VLAN ID runs from 1 to 4094")
+  .max(4094, "A VLAN ID runs from 1 to 4094");
 
 const MAX_TEXT = 10_000;
 const MAX_LONG_TEXT = 200_000;
@@ -49,7 +152,29 @@ function baseSchema(field: FieldDefinition, ctx: ValidationContext): z.ZodType {
     case "url":
       return z.url({ protocol: /^https?$/, error: "Enter an http or https URL" }).max(2_000);
     case "ip":
-      return z.union([z.ipv4(), z.ipv6()], { error: "Enter an IPv4 or IPv6 address" });
+      return ipSchema;
+    case "network":
+      return networkSchema;
+    case "ip_range":
+      return ipRangeSchema;
+    case "mac": {
+      const format = effectiveMacFormat(field, ctx.macFormat);
+      return z.string().transform((text, issue) => {
+        const digits = parseMac(text);
+        if (!digits) {
+          issue.addIssue({
+            code: "custom",
+            message: "Enter a MAC address: twelve hex digits, with or without separators",
+          });
+          return z.NEVER;
+        }
+        return formatMac(digits, format);
+      });
+    }
+    case "vlan":
+      return vlanSchema;
+    case "hostname":
+      return hostnameSchema;
     case "boolean":
       return z.boolean();
     case "dropdown":
@@ -200,6 +325,35 @@ export function flattenForSearch(
         // Index the linked document's title, not its UUID.
         const title = ctx.linkTargets?.get(field.id)?.get(String(value));
         if (title) parts.push(title);
+        break;
+      }
+
+      case "ip":
+      case "network": {
+        // The bare address as well, so a search for it finds the field.
+        const text = String(value);
+        parts.push(text, text.split("/")[0] ?? "");
+        break;
+      }
+
+      case "ip_range":
+        parts.push(String(value).replace("-", " "));
+        break;
+
+      case "mac": {
+        // Every common spelling finds it, since the search parser splits each
+        // one into different tokens: bare, colons, hyphens, dotted groups.
+        const digits = parseMac(String(value));
+        if (!digits) {
+          parts.push(String(value));
+          break;
+        }
+        const spellings = new Set(
+          (["bare_lower", "colon_lower", "hyphen_lower", "dot_lower"] as const).map((format) =>
+            formatMac(digits, format),
+          ),
+        );
+        parts.push(...spellings);
         break;
       }
 

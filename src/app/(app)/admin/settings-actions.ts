@@ -13,6 +13,7 @@ import {
   setDefaultLocale,
   setDomainCheckPolicy,
   setKbPublicSettings,
+  setMacFormat,
 } from "@/server/services/settings";
 
 export async function setDefaultLocaleAction(
@@ -29,6 +30,25 @@ export async function setDefaultLocaleAction(
   }
 
   // The language reaches every page, so the whole tree is revalidated.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function setMacFormatAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const user = await requireAdmin();
+    await requireRecentMfa(user);
+    await setMacFormat(text(formData, "macFormat") ?? "", user.id);
+  } catch (err) {
+    if (err instanceof ZodError) return { fieldErrors: { macFormat: "Choose one of the formats listed" } };
+    if (err instanceof ForbiddenError) return { error: err.message };
+    throw err;
+  }
+
+  // Documents show saved addresses in the format in force, so every page may change.
   revalidatePath("/", "layout");
   return { ok: true };
 }

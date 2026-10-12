@@ -60,6 +60,7 @@ function f(id: string, overrides: Partial<FieldDefinition> = {}): FieldDefinitio
     linkDocTypeId: null,
     required: false,
     sortOrder: 0,
+    macFormat: null,
     archivedAt: null,
     docTypeId: "type-1",
     documentId: null,

@@ -12,6 +12,12 @@ import {
 import { z } from "zod";
 import { isLocale, type Locale } from "@/i18n/locales";
 import { parseAddressList } from "@/server/kb/addresses";
+import {
+  DEFAULT_MAC_FORMAT,
+  MAC_FORMATS,
+  isMacFormat,
+  type MacFormat,
+} from "@/lib/net/mac";
 
 /**
  * Settings an operator chooses once for the whole installation. Today that is
@@ -285,6 +291,42 @@ export async function setDomainCheckPolicy(
         entity: "instance",
         entityId: null,
         detail: { domainChecks: value },
+      },
+      tx,
+    );
+  });
+}
+
+/** How MAC address fields write an address unless a field names its own format. */
+export async function getMacFormat(): Promise<MacFormat> {
+  const [row] = await db
+    .select({ macFormat: instanceSettings.macFormat })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, true))
+    .limit(1);
+
+  return isMacFormat(row?.macFormat) ? row.macFormat : DEFAULT_MAC_FORMAT;
+}
+
+export async function setMacFormat(format: string, actorId: string): Promise<void> {
+  const value = z.enum(MAC_FORMATS).parse(format);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(instanceSettings)
+      .values({ id: true, macFormat: value, updatedBy: actorId })
+      .onConflictDoUpdate({
+        target: instanceSettings.id,
+        set: { macFormat: value, updatedAt: new Date(), updatedBy: actorId },
+      });
+
+    await writeAudit(
+      {
+        userId: actorId,
+        action: "settings.updated",
+        entity: "instance",
+        entityId: null,
+        detail: { macFormat: value },
       },
       tx,
     );

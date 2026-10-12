@@ -281,6 +281,13 @@
       "when": 1791484279426,
       "tag": "0039_instance_tab_icons",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791821366648,
+      "tag": "0040_network_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { getMacFormat } from "@/server/services/settings";
 import { notFound, redirect } from "next/navigation";
 import { canManageDocTypes, requireUser } from "@/server/auth/session";
 import { getDocType, listDocTypes } from "@/server/services/doc-types";
@@ -28,7 +29,11 @@ export default async function EditTemplateFieldPage({
   const field = docType.fields.find((candidate) => candidate.id === fieldId);
   if (!field) notFound();
 
-  const [optionLists, allDocTypes] = await Promise.all([listOptionLists(), listDocTypes()]);
+  const [optionLists, allDocTypes, macFormat] = await Promise.all([
+    listOptionLists(),
+    listDocTypes(),
+    getMacFormat(),
+  ]);
   const t = await getMessages();
 
   return (
@@ -48,8 +53,10 @@ export default async function EditTemplateFieldPage({
           fieldType: field.fieldType,
           optionListId: field.optionListId,
           linkDocTypeId: field.linkDocTypeId,
+          macFormat: field.macFormat,
           required: field.required,
         }}
+        instanceMacFormat={macFormat}
         fieldTypes={EDITABLE_FIELD_TYPES.map((value) => ({
           value,
           label: FIELD_TYPE_LABELS[value],

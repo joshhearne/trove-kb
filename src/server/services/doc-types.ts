@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { MAC_FORMATS } from "@/lib/net/mac";
 import { isIconName } from "@/lib/icon-name";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db, type Executor } from "@/server/db";
@@ -9,6 +10,7 @@ import { NotFoundError } from "@/server/services/companies";
 import {
   EDITABLE_FIELD_TYPES,
   usesLinkDocType,
+  usesMacFormat,
   usesOptionList,
   type FieldDefinition,
 } from "@/server/fields/types";
@@ -34,6 +36,7 @@ export const templateFieldInputSchema = z
     fieldType: editableFieldType,
     optionListId: z.uuid().optional().nullable(),
     linkDocTypeId: z.uuid().optional().nullable(),
+    macFormat: z.enum(MAC_FORMATS).optional().nullable(),
     required: z.boolean().default(false),
   })
   .refine((v) => !usesOptionList(v.fieldType) || !!v.optionListId, {
@@ -47,6 +50,10 @@ export const templateFieldInputSchema = z
   .refine((v) => usesLinkDocType(v.fieldType) || !v.linkDocTypeId, {
     message: "Only a link field points at a doc type",
     path: ["linkDocTypeId"],
+  })
+  .refine((v) => usesMacFormat(v.fieldType) || !v.macFormat, {
+    message: "Only a MAC address field has a format",
+    path: ["macFormat"],
   });
 
 export type DocTypeInput = z.infer<typeof docTypeInputSchema>;
@@ -112,6 +119,7 @@ export async function listTemplateFields(
       linkDocTypeId: fields.linkDocTypeId,
       required: fields.required,
       sortOrder: fields.sortOrder,
+      macFormat: fields.macFormat,
       archivedAt: fields.archivedAt,
       docTypeId: fields.docTypeId,
       documentId: fields.documentId,
@@ -240,6 +248,7 @@ export async function addTemplateField(
         fieldType: data.fieldType,
         optionListId: data.optionListId ?? null,
         linkDocTypeId: data.linkDocTypeId ?? null,
+        macFormat: data.macFormat ?? null,
         required: data.required,
         sortOrder: next,
       })
@@ -275,6 +284,7 @@ export async function updateTemplateField(
         fieldType: data.fieldType,
         optionListId: data.optionListId ?? null,
         linkDocTypeId: data.linkDocTypeId ?? null,
+        macFormat: data.macFormat ?? null,
         required: data.required,
       })
       .where(eq(fields.id, id))

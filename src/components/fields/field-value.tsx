@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { RenderedValue } from "@/server/fields/render";
+import { IpRangeView, IpValueView, MacValueView } from "@/components/fields/network-value";
 
 /** Read-only rendering of one already-resolved field value. */
 export function FieldValue({ value }: { value: RenderedValue }) {
@@ -9,6 +10,18 @@ export function FieldValue({ value }: { value: RenderedValue }) {
 
     case "text":
       return <span className="text-sm whitespace-pre-wrap">{value.text}</span>;
+
+    case "code":
+      return <span className="font-mono text-sm">{value.text}</span>;
+
+    case "ip":
+      return <IpValueView value={value} />;
+
+    case "range":
+      return <IpRangeView value={value} />;
+
+    case "mac":
+      return <MacValueView value={value} />;
 
     case "url":
       return (

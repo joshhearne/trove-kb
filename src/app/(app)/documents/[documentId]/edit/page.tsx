@@ -1,3 +1,4 @@
+import { effectiveMacFormat } from "@/server/fields/values";
 import { notFound, redirect } from "next/navigation";
 import {
   canEditDocuments,
@@ -93,8 +94,10 @@ export default async function EditDocumentPage({
           required: field.required,
           optionListId: field.optionListId,
           linkDocTypeId: field.linkDocTypeId,
+          macFormat: effectiveMacFormat(field, detail.macFormat),
           isLocal: field.documentId !== null,
         }))}
+        instanceMacFormat={detail.macFormat}
       />
     </BrandAccent>
   );

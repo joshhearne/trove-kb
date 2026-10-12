@@ -45,6 +45,8 @@ import {
   type FieldDraft,
 } from "../../inline-actions";
 import { Select } from "@/components/ui/select";
+import { NetworkFieldSettings } from "@/components/fields/network-field-settings";
+import { isMacFormat, type MacFormat } from "@/lib/net/mac";
 
 export type FieldTypeChoice = {
   value: EditableFieldType;
@@ -84,6 +86,7 @@ export function DocumentEditor({
   linkTargets,
   secretItems,
   canManageTemplate,
+  instanceMacFormat,
 }: {
   documentId: string;
   docTypeId: string;
@@ -100,6 +103,7 @@ export function DocumentEditor({
   /** Vault items each secret_ref field may reference, keyed by field id. */
   secretItems: Record<string, FieldOption[]>;
   canManageTemplate: boolean;
+  instanceMacFormat: MacFormat;
 }) {
   const [state, formAction] = useActionState<FormState, FormData>(saveDocumentAction, {});
   const [fields, setFields] = useState(initialFields);
@@ -313,8 +317,11 @@ export function DocumentEditor({
             fieldType: promoting.fieldType as EditableFieldType,
             optionListId: promoting.optionListId,
             linkDocTypeId: promoting.linkDocTypeId,
+            // The payload carries the format in force; keep it as the field's own.
+            macFormat: promoting.fieldType === "mac" ? promoting.macFormat : null,
             required: promoting.required,
           }}
+          instanceMacFormat={instanceMacFormat}
           onCancel={() => setPromoting(null)}
           onSubmit={(draft) =>
             startTransition(async () => {
@@ -348,8 +355,10 @@ export function DocumentEditor({
             fieldType: "text",
             optionListId: null,
             linkDocTypeId: null,
+            macFormat: null,
             required: false,
           }}
+          instanceMacFormat={instanceMacFormat}
           onCancel={() => setAddingField(false)}
           onSubmit={(draft) =>
             startTransition(async () => {
@@ -467,6 +476,7 @@ function FieldDraftPanel({
   docTypes,
   initial,
   busy,
+  instanceMacFormat,
   onSubmit,
   onCancel,
 }: {
@@ -478,6 +488,7 @@ function FieldDraftPanel({
   docTypes: DocTypeChoice[];
   initial: FieldDraft;
   busy: boolean;
+  instanceMacFormat: MacFormat;
   onSubmit: (draft: FieldDraft) => void;
   onCancel: () => void;
 }) {
@@ -486,6 +497,7 @@ function FieldDraftPanel({
   const [optionListId, setOptionListId] = useState(initial.optionListId ?? "");
   const [linkDocTypeId, setLinkDocTypeId] = useState(initial.linkDocTypeId ?? "");
   const [required, setRequired] = useState(initial.required);
+  const [macFormat, setMacFormat] = useState(initial.macFormat ?? "");
 
   const t = useMessages();
   const choice = fieldTypes.find((type) => type.value === fieldType);
@@ -563,6 +575,14 @@ function FieldDraftPanel({
         </Field>
       )}
 
+      <NetworkFieldSettings
+        fieldType={fieldType}
+        instanceMacFormat={instanceMacFormat}
+        macFormat={macFormat}
+        onMacFormatChange={setMacFormat}
+        idPrefix="draft"
+      />
+
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -583,6 +603,7 @@ function FieldDraftPanel({
               fieldType,
               optionListId: needsList ? optionListId || null : null,
               linkDocTypeId: needsDocType ? linkDocTypeId || null : null,
+              macFormat: fieldType === "mac" && isMacFormat(macFormat) ? macFormat : null,
               required,
             })
           }

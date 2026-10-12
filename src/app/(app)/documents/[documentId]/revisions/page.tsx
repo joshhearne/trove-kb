@@ -70,6 +70,7 @@ export default async function RevisionsPage({
                           detail.optionLabels,
                           detail.linkedTitles,
                           locale,
+                          detail.macFormat,
                         )}
                       />
                     </dd>

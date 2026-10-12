@@ -1,3 +1,5 @@
+import { effectiveMacFormat } from "@/server/fields/values";
+import { getMacFormat } from "@/server/services/settings";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
@@ -118,10 +120,11 @@ export default async function NewDocumentPage({
   }
 
   const templateFields = await listTemplateFields(chosen.id);
-  const [optionIndex, linkTargets, secrets] = await Promise.all([
+  const [optionIndex, linkTargets, secrets, macFormat] = await Promise.all([
     loadOptionIndex(templateFields.flatMap((f) => (f.optionListId ? [f.optionListId] : []))),
     loadLinkTargets(templateFields, company.id, null),
     loadSecretItems(templateFields, company.id, scope),
+    getMacFormat(),
   ]);
 
   return (
@@ -161,6 +164,7 @@ export default async function NewDocumentPage({
           required: field.required,
           optionListId: field.optionListId,
           linkDocTypeId: field.linkDocTypeId,
+          macFormat: effectiveMacFormat(field, macFormat),
           isLocal: false,
         }))}
       />

@@ -11,6 +11,7 @@ function field(id: string, fieldType: FieldType): FieldDefinition {
     linkDocTypeId: null,
     required: false,
     sortOrder: 0,
+    macFormat: null,
     archivedAt: null,
     docTypeId: "t",
     documentId: null,

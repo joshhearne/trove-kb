@@ -2,8 +2,19 @@ import "server-only";
 import { marked } from "marked";
 import { sanitizeRichText } from "@/server/fields/sanitize";
 import type { FieldDefinition } from "@/server/fields/types";
-import { formatDate, formatNumber } from "@/i18n/format";
+import { formatCount, formatDate, formatNumber } from "@/i18n/format";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
+import {
+  addressKind,
+  describeBlock,
+  formatAddress,
+  parseCidr,
+  parseRange,
+  rangeSize,
+  type AddressKind,
+} from "@/lib/net/ip";
+import { formatMac, isLocallyAdministered, parseMac, type MacFormat } from "@/lib/net/mac";
+import { effectiveMacFormat } from "@/server/fields/values";
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -14,8 +25,34 @@ export function renderMarkdown(source: string): string {
 
 export { formatDate, formatDateTime } from "@/i18n/format";
 
+/** The block an address or network sits in, with counts already formatted. */
+export type RenderedBlock = {
+  network: string;
+  mask: string | null;
+  wildcard: string | null;
+  broadcast: string | null;
+  firstUsable: string;
+  lastUsable: string;
+  usable: string;
+  total: string;
+};
+
 export type RenderedValue =
   | { kind: "empty" }
+  | { kind: "code"; text: string }
+  | {
+      kind: "ip";
+      /** What the field holds: one address, or a whole network. */
+      role: "address" | "network";
+      address: string;
+      prefix: number;
+      /** For an address: alone, on a subnet, or the subnet's own address. */
+      addressKind: AddressKind;
+      /** Null for a single address (/32, /128): there is no block to describe. */
+      block: RenderedBlock | null;
+    }
+  | { kind: "range"; start: string; end: string; size: string }
+  | { kind: "mac"; text: string; locallyAdministered: boolean }
   | { kind: "text"; text: string }
   | { kind: "url"; href: string }
   | { kind: "html"; html: string }
@@ -40,6 +77,8 @@ export function renderFieldValue(
   /** Titles of linked documents, for doc_link fields. */
   documentTitles: Map<string, string> = new Map(),
   locale: Locale = DEFAULT_LOCALE,
+  /** The instance's MAC format, which mac fields without their own follow. */
+  macFormat?: MacFormat,
 ): RenderedValue {
   if (value === null || value === undefined || value === "") return { kind: "empty" };
 
@@ -56,6 +95,62 @@ export function renderFieldValue(
 
     case "boolean":
       return { kind: "text", text: value === true ? "Yes" : "No" };
+
+    case "ip":
+    case "network": {
+      // Older ip values were stored without a prefix: they are one address.
+      const parsed = parseCidr(String(value), "host");
+      if (!parsed.ok) return { kind: "text", text: String(value) };
+      const cidr = parsed.value;
+      const role = field.fieldType === "network" ? "network" : "address";
+      const kind = addressKind(cidr);
+      const block = role === "network" || kind !== "host" ? describeBlock(cidr) : null;
+      return {
+        kind: "ip",
+        role,
+        address: formatAddress(cidr.address),
+        prefix: cidr.prefix,
+        addressKind: kind,
+        block: block && {
+          network: block.network,
+          mask: block.mask,
+          wildcard: block.wildcard,
+          broadcast: block.broadcast,
+          firstUsable: block.firstUsable,
+          lastUsable: block.lastUsable,
+          usable: formatCount(block.usable, locale),
+          total: formatCount(block.total, locale),
+        },
+      };
+    }
+
+    case "ip_range": {
+      const parsed = parseRange(String(value));
+      if (!parsed.ok) return { kind: "text", text: String(value) };
+      return {
+        kind: "range",
+        start: formatAddress(parsed.value.start),
+        end: formatAddress(parsed.value.end),
+        size: formatCount(rangeSize(parsed.value), locale),
+      };
+    }
+
+    case "mac": {
+      // Shown in the format in force now, whatever it was saved under.
+      const digits = parseMac(String(value));
+      if (!digits) return { kind: "text", text: String(value) };
+      return {
+        kind: "mac",
+        text: formatMac(digits, effectiveMacFormat(field, macFormat)),
+        locallyAdministered: isLocallyAdministered(digits),
+      };
+    }
+
+    case "hostname":
+      return { kind: "code", text: String(value) };
+
+    case "vlan":
+      return { kind: "text", text: String(value) };
 
     case "date":
       return { kind: "text", text: formatDate(String(value), locale) };
@@ -101,3 +196,4 @@ export function renderFieldValue(
       return { kind: "text", text: String(value) };
   }
 }
+

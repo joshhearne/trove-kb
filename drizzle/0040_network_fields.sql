@@ -1,0 +1,6 @@
+ALTER TABLE "fields" DROP CONSTRAINT "fields_field_type_check";--> statement-breakpoint
+ALTER TABLE "fields" ADD COLUMN "mac_format" text;--> statement-breakpoint
+ALTER TABLE "instance_settings" ADD COLUMN "mac_format" text DEFAULT 'colon_upper' NOT NULL;--> statement-breakpoint
+ALTER TABLE "fields" ADD CONSTRAINT "fields_mac_format_check" CHECK ("fields"."mac_format" IS NULL OR "fields"."mac_format" IN ('colon_upper','colon_lower','hyphen_upper','hyphen_lower','dot_lower','dot_upper','bare_upper','bare_lower'));--> statement-breakpoint
+ALTER TABLE "fields" ADD CONSTRAINT "fields_field_type_check" CHECK ("fields"."field_type" IN ('text','markdown','richtext','number','date','url','ip','network','ip_range','mac','vlan','hostname','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));--> statement-breakpoint
+ALTER TABLE "instance_settings" ADD CONSTRAINT "instance_settings_mac_format_check" CHECK ("instance_settings"."mac_format" IN ('colon_upper','colon_lower','hyphen_upper','hyphen_lower','dot_lower','dot_upper','bare_upper','bare_lower'));

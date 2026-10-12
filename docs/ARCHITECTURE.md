@@ -27,7 +27,13 @@ Single container plus Postgres, with an optional bw-serve sidecar for Bitwarden/
 ## Field value storage
 | field_type | Stored as |
 |---|---|
-| text, url, ip | string |
+| text, url | string |
+| ip | `address/prefix` string; a blank prefix is saved as /32 (IPv4) or /128 (IPv6) |
+| network | `network/prefix` string, host bits cleared; prefix /0–/31 (IPv4) or /0–/127 (IPv6) |
+| ip_range | `first-last` string, same family, first ≤ last |
+| mac | string in the field's MAC format (its own, else the instance's) |
+| vlan | number, 1–4094 |
+| hostname | lowercase string, trailing dot dropped |
 | markdown | markdown source string |
 | richtext | sanitized HTML string (sanitize server-side on write) |
 | number | number |
@@ -51,6 +57,32 @@ it plain. A markdown field also has a **Visual | Markdown** switch: the second
 is the source in a textarea, and going back re-parses it. On the view side
 `marked` (GFM) renders the source and `sanitizeRichText` allows the result: an
 `<input>` survives only as a disabled checkbox, whatever it claimed to be.
+
+### Network fields
+`src/lib/net/ip.ts` and `src/lib/net/mac.ts` hold the parsing and arithmetic,
+with no server-only imports, so validation (`fields/values.ts`), rendering
+(`fields/render.ts`), and the editor's live preview all use the same code.
+
+- **IP address** (`ip`) is one host. The control is the address plus a prefix
+  select; blank means the single address and is saved as /32 or /128. A prefix
+  records the subnet the host sits on, and the document view shows the block
+  it works out (network, mask, wildcard, broadcast, usable range and count).
+- **Network** (`network`) is a block. The prefix is required and stops short of
+  a single address, and the host bits are cleared on save: 192.168.1.77/24 is
+  kept as 192.168.1.0/24. The view badges "Network" against "Address" so the
+  two never read alike.
+- Both accept `10.0.0.5/24`, `10.0.0.5/255.255.255.0`, and
+  `10.0.0.5 255.255.255.0`, typed, pasted, or sent through the API. IPv6 is
+  written per RFC 5952. IPv4 /31 counts both addresses (RFC 3021).
+- **MAC address** (`mac`) is stored in a format: colons, hyphens, dotted
+  groups of four, or none, each upper or lower case. `fields.mac_format`
+  chooses one per field; null follows `instance_settings.mac_format` (Admin →
+  Settings → Network fields). The editor rewrites a whole address into the
+  format as it is typed or pasted, the server does the same on save, and the
+  view and the API's `resolved` show stored values in the format in force now.
+  Search indexes the bare and colon spellings too.
+- **IP range** (`ip_range`), **VLAN ID** (`vlan`) and **Hostname** (`hostname`)
+  validate their shape and nothing more.
 
 ## Inline editing rules (the whole point of the project)
 1. Edit mode shows every field of the document, template fields first, then local fields, respecting `field_order` if set.

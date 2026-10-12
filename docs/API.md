@@ -32,6 +32,17 @@ POST   /option-lists/:id/items
 GET    /search                     ?q=&company_id=&doc_type=
 ```
 
+## Field values
+Values are keyed by field UUID. Network types are normalized on write and come
+back in that form in `value`:
+- `ip`: `"10.0.0.5/24"`; send `"10.0.0.5"` for a single address (stored as `/32`,
+  or `/128` for IPv6). A dotted mask is accepted: `"10.0.0.5 255.255.255.0"`.
+- `network`: `"10.0.0.0/24"`; a prefix is required, and host bits are cleared.
+- `ip_range`: `"192.168.1.100-192.168.1.199"`.
+- `mac`: any common spelling; stored in the field's format (`mac_format` on the
+  field, else the instance's). `resolved` shows it in the format in force now.
+- `vlan`: a number from 1 to 4094. `hostname`: lowercased.
+
 ## Company scope
 A key is created with either every company or a named set. Everything below is
 filtered by it: lists omit what the key may not see, and a single record it may

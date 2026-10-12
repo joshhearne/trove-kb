@@ -1,6 +1,7 @@
 import "server-only";
 import type { FieldDefinition } from "@/server/fields/types";
 import { renderFieldValue, renderMarkdown } from "@/server/fields/render";
+import type { MacFormat } from "@/lib/net/mac";
 
 /**
  * The wire shapes for /api/v1. docs/ARCHITECTURE.md asks for resolved values
@@ -29,6 +30,7 @@ export function serializeField(field: FieldDefinition) {
     option_list_id: field.optionListId,
     link_doc_type_id: field.linkDocTypeId,
     sort_order: field.sortOrder,
+    mac_format: field.macFormat,
     archived_at: field.archivedAt?.toISOString() ?? null,
   };
 }
@@ -38,6 +40,7 @@ function resolve(
   value: unknown,
   optionLabels: Map<string, string>,
   linkedTitles: Map<string, string>,
+  macFormat?: MacFormat,
 ): string | string[] | null {
   if (field.fieldType === "markdown" && typeof value === "string" && value !== "") {
     return renderMarkdown(value);
@@ -50,10 +53,23 @@ function resolve(
     return labels.length > 0 ? labels : null;
   }
 
-  const rendered = renderFieldValue(field, value, optionLabels, linkedTitles);
+  const rendered = renderFieldValue(
+    field,
+    value,
+    optionLabels,
+    linkedTitles,
+    undefined,
+    macFormat,
+  );
   switch (rendered.kind) {
     case "text":
+    case "code":
+    case "mac":
       return rendered.text;
+    case "ip":
+      return `${rendered.address}/${rendered.prefix}`;
+    case "range":
+      return `${rendered.start}-${rendered.end}`;
     case "url":
       return rendered.href;
     case "html":
@@ -77,6 +93,8 @@ export function serializeFieldValues(
   linkedTitles: Map<string, string> = new Map(),
   /** Webhooks carry no secret_ref payload at all (CLAUDE.md). */
   redactSecrets = false,
+  /** The instance's MAC format, so `resolved` shows addresses as configured. */
+  macFormat?: MacFormat,
 ): ApiFieldValue[] {
   return fieldList.map((field) => {
     const raw = values[field.id] ?? null;
@@ -89,7 +107,7 @@ export function serializeFieldValues(
       required: field.required,
       value: secret && redactSecrets ? null : raw,
       resolved:
-        secret && redactSecrets ? null : resolve(field, raw, optionLabels, linkedTitles),
+        secret && redactSecrets ? null : resolve(field, raw, optionLabels, linkedTitles, macFormat),
       local: field.documentId !== null,
     };
   });
@@ -174,6 +192,7 @@ export function serializeDocument(input: {
   externalRefs?: ExternalRefPair[];
   /** Set for webhook payloads, which must carry no vault reference. */
   redactSecrets?: boolean;
+  macFormat?: MacFormat;
 }) {
   return {
     id: input.document.id,
@@ -191,6 +210,7 @@ export function serializeDocument(input: {
       input.optionLabels,
       input.linkedTitles ?? new Map(),
       input.redactSecrets ?? false,
+      input.macFormat,
     ),
     updated_at: input.document.updatedAt.toISOString(),
     archived_at: input.document.archivedAt?.toISOString() ?? null,

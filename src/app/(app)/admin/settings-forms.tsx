@@ -11,7 +11,9 @@ import {
   setDefaultLocaleAction,
   setDomainCheckPolicyAction,
   setKbPublicAction,
+  setMacFormatAction,
 } from "./settings-actions";
+import { MAC_FORMATS, macFormatExample, type MacFormat } from "@/lib/net/mac";
 import {
   INTERVAL_CHOICES,
   TLS_WARN_CHOICES,
@@ -65,6 +67,45 @@ export function DefaultLocaleForm({
         <Button type="submit" disabled={pending}>
           {pending ? t.common.saving : t.common.save}
         </Button>
+      </div>
+    </form>
+  );
+}
+
+function SubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  const t = useMessages();
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? t.common.saving : label}
+    </Button>
+  );
+}
+
+/** How MAC address fields write an address unless a field names its own format. */
+export function MacFormatForm({ current }: { current: MacFormat }) {
+  const [state, formAction] = useActionState<FormState, FormData>(setMacFormatAction, {});
+  const t = useMessages();
+
+  return (
+    <form action={formAction} className="flex max-w-xl flex-col gap-3">
+      <FormError>{state.error}</FormError>
+      <Field id="macFormat" label={t.editor.net.macFormat} error={state.fieldErrors?.macFormat}>
+        <Select
+          id="macFormat"
+          name="macFormat"
+          defaultValue={current}
+          className="h-10 w-full rounded-md border bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          {MAC_FORMATS.map((format) => (
+            <option key={format} value={format}>
+              {`${t.editor.net.macFormats[format]}: ${macFormatExample(format)}`}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div>
+        <SubmitButton label={t.admin.settings.networkSave} />
       </div>
     </form>
   );

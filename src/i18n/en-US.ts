@@ -565,6 +565,64 @@ export const enUS = {
     noVaultItems:
       "No vault items are available. Map this company to a Bitwarden collection under Admin → Vault, and check the sidecar is unlocked.",
     failed: "That did not work",
+    net: {
+      ipHint:
+        "On the document this field comes with a prefix (/nn) selector beside the address. Leave the prefix blank for a single address: it is saved as /32 (IPv4) or /128 (IPv6). Pick one such as /24 to record the subnet the address sits on, and the network block is worked out when the document is saved.",
+      networkHint:
+        "Holds a whole network, not one address. On the document a prefix is required, from /31 down to /0 for IPv4 (/127 for IPv6), and the network address is taken from it when the document is saved: 192.168.1.77/24 is kept as 192.168.1.0/24.",
+      rangeHint:
+        "A first and a last address, such as a DHCP pool. Both ends must be IPv4, or both IPv6.",
+      macHint:
+        "Anything typed or pasted into the field is rewritten in this format straight away, and saved that way.",
+      vlanHint: "A whole number from 1 to 4094.",
+      hostnameHint:
+        "A short name such as fw01, or a fully qualified one such as fw01.example.com. Saved in lowercase.",
+      macFormat: "MAC address format",
+      macFormatDefault: (example: string) => `Instance default (${example})`,
+      macFormats: {
+        colon_upper: "Colons, uppercase",
+        colon_lower: "Colons, lowercase",
+        hyphen_upper: "Hyphens, uppercase",
+        hyphen_lower: "Hyphens, lowercase",
+        dot_lower: "Dotted groups of four, lowercase",
+        dot_upper: "Dotted groups of four, uppercase",
+        bare_upper: "No separators, uppercase",
+        bare_lower: "No separators, lowercase",
+      },
+      address: (label: string) => `${label} address`,
+      prefix: (label: string) => `${label} prefix`,
+      singleAddress: (max: number) => `/${max} (single address)`,
+      choosePrefix: "Prefix…",
+      ipControlHint:
+        "Leave the prefix blank for a single address. Pasting 10.0.0.5/24 or 10.0.0.5 255.255.255.0 fills both.",
+      networkControlHint:
+        "Pick the prefix. Pasting 10.0.0.0/24 or 10.0.0.0 255.255.255.0 fills both.",
+      singleAddressPreview: (max: number) => `One address (/${max}).`,
+      onNetworkPreview: (network: string, first: string, last: string, usable: string) =>
+        `On ${network}: usable ${first} to ${last} (${usable}).`,
+      networkPreview: (first: string, last: string, usable: string) =>
+        `Usable ${first} to ${last} (${usable}).`,
+      savedAs: (text: string) => `Saved as ${text}.`,
+      rangeStart: (label: string) => `${label}, first address`,
+      rangeEnd: (label: string) => `${label}, last address`,
+      rangePreview: (count: string) => `${count} addresses.`,
+      macPreview: (example: string) => `Written as ${example}.`,
+      badgeAddress: "Address",
+      badgeNetwork: "Network",
+      onNetwork: (network: string) => `on ${network}`,
+      networkAddressNote:
+        "This is the network's own address, which no host can use. A Network field may suit it better.",
+      blockDetails: "Block details",
+      blockNetwork: "Network",
+      blockMask: "Subnet mask",
+      blockWildcard: "Wildcard mask",
+      blockBroadcast: "Broadcast",
+      blockUsableRange: "Usable range",
+      blockUsable: "Usable addresses",
+      blockTotal: "Total addresses",
+      rangeSize: (count: string) => `${count} addresses`,
+      locallyAdministered: "Locally administered: set by software or by hand, not by the maker.",
+    },
   },
 
   secrets: {
@@ -875,6 +933,10 @@ export const enUS = {
       publicAccessAudHint:
         "From the application's Overview in Zero Trust: a long hexadecimal string.",
       publicSave: "Update public site",
+      network: "Network fields",
+      networkSave: "Update network fields",
+      networkHint:
+        "How MAC address fields write an address. A field can choose a format of its own when it is created; the rest follow this one, and addresses already saved are shown in it too.",
       domainChecks: "Automatic domain checks",
       domainChecksHint:
         "How often the worker re-runs each kind of check a domain record has turned on. A company can set its own timings for its records, and a record its own; this is what the rest follow.",

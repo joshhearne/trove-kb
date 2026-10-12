@@ -11,6 +11,8 @@ import {
   locations,
 } from "@/server/db/schema";
 import { writeAudit } from "@/server/services/audit";
+import { getMacFormat } from "@/server/services/settings";
+import type { MacFormat } from "@/lib/net/mac";
 import { queueEvent } from "@/server/services/webhooks";
 import { serializeDocument } from "@/server/api/serializers";
 import { NotFoundError } from "@/server/services/companies";
@@ -154,6 +156,7 @@ async function listLocalFields(
       linkDocTypeId: fields.linkDocTypeId,
       required: fields.required,
       sortOrder: fields.sortOrder,
+      macFormat: fields.macFormat,
       archivedAt: fields.archivedAt,
       docTypeId: fields.docTypeId,
       documentId: fields.documentId,
@@ -336,6 +339,8 @@ export type DocumentDetail = {
   secretItems: SecretItemIndex;
   /** Null when the document has no secret_ref field. */
   vault: VaultContext | null;
+  /** The instance's MAC format, for mac fields without one of their own. */
+  macFormat: MacFormat;
 };
 
 /**
@@ -392,10 +397,11 @@ export async function getDocumentDetail(
     .map((field) => row.document.fieldValues?.[field.id])
     .filter((value): value is string => typeof value === "string" && value !== "");
 
-  const [linkTargets, linkedTitles, secrets] = await Promise.all([
+  const [linkTargets, linkedTitles, secrets, macFormat] = await Promise.all([
     loadLinkTargets(ordered, row.document.companyId, row.document.id),
     loadLinkedTitles(linkedIds),
     loadSecretItems(ordered, row.document.companyId, scope),
+    getMacFormat(),
   ]);
 
   return {
@@ -409,6 +415,7 @@ export async function getDocumentDetail(
     linkedTitles,
     secretItems: secrets.index,
     vault: secrets.vault,
+    macFormat,
   };
 }
 
@@ -475,15 +482,17 @@ export async function createDocument(
   await assertScope(input.docTypeId, input.companyId, input.locationId);
 
   const templateFields = await listTemplateFields(input.docTypeId);
-  const [optionIndex, linkTargets, secrets] = await Promise.all([
+  const [optionIndex, linkTargets, secrets, macFormat] = await Promise.all([
     loadOptionIndex(templateFields.flatMap((f) => (f.optionListId ? [f.optionListId] : []))),
     loadLinkTargets(templateFields, input.companyId, null),
     loadSecretItems(templateFields, input.companyId, scope),
+    getMacFormat(),
   ]);
   const ctx: ValidationContext = {
     options: optionIndex,
     linkTargets,
     secretItems: secrets.index,
+    macFormat,
   };
 
   const raw = input.values ?? {};
@@ -575,6 +584,7 @@ export async function saveDocument(
     options: detail.optionIndex,
     linkTargets: detail.linkTargets,
     secretItems: detail.secretItems,
+    macFormat: detail.macFormat,
   };
   const validated = validateFieldValues(detail.fields, input.values ?? {}, ctx);
   Object.assign(errors, validated.errors);

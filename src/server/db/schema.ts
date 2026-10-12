@@ -6,6 +6,7 @@
  */
 import { sql } from "drizzle-orm";
 import type { RunbookStep } from "@/server/kb/runbook";
+import { DEFAULT_MAC_FORMAT, MAC_FORMATS } from "@/lib/net/mac";
 import {
   bigint,
   bigserial,
@@ -423,6 +424,9 @@ export const documents = pgTable(
 
 /* ---------- Fields ---------- */
 
+/** The MAC formats a CHECK allows, as a SQL list. */
+const MAC_FORMAT_SQL = sql.raw(MAC_FORMATS.map((format) => `'${format}'`).join(","));
+
 export const FIELD_TYPES = [
   "text",
   "markdown",
@@ -431,6 +435,11 @@ export const FIELD_TYPES = [
   "date",
   "url",
   "ip",
+  "network",
+  "ip_range",
+  "mac",
+  "vlan",
+  "hostname",
   "boolean",
   "dropdown",
   "multi_dropdown",
@@ -466,16 +475,25 @@ export const fields = pgTable(
      * which is nearly all of them.
      */
     domainRole: text("domain_role"),
+    /**
+     * mac only: how this field writes an address. Null follows the instance
+     * setting (instance_settings.mac_format).
+     */
+    macFormat: text("mac_format"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (t) => [
+    check(
+      "fields_mac_format_check",
+      sql`${t.macFormat} IS NULL OR ${t.macFormat} IN (${MAC_FORMAT_SQL})`,
+    ),
     check(
       "fields_domain_role_check",
       sql`${t.domainRole} IS NULL OR ${t.domainRole} IN ('domain','expiry','registrar','dns_host')`,
     ),
     check(
       "fields_field_type_check",
-      sql`${t.fieldType} IN ('text','markdown','richtext','number','date','url','ip','boolean','dropdown','multi_dropdown','doc_link','secret_ref')`,
+      sql`${t.fieldType} IN ('text','markdown','richtext','number','date','url','ip','network','ip_range','mac','vlan','hostname','boolean','dropdown','multi_dropdown','doc_link','secret_ref')`,
     ),
     check(
       "fields_owner_check",
@@ -711,6 +729,8 @@ export const instanceSettings = pgTable(
       .default(7),
     /** Days ahead of a certificate's expiry to warn, unless a company or record says otherwise. */
     domainTlsWarnDays: integer("domain_tls_warn_days").notNull().default(30),
+    /** How MAC address fields write an address unless the field says otherwise. */
+    macFormat: text("mac_format").notNull().default(DEFAULT_MAC_FORMAT),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .default(now),
@@ -718,6 +738,10 @@ export const instanceSettings = pgTable(
   },
   (t) => [
     check("instance_settings_singleton", sql`${t.id}`),
+    check(
+      "instance_settings_mac_format_check",
+      sql`${t.macFormat} IN (${MAC_FORMAT_SQL})`,
+    ),
     check(
       "instance_settings_kb_public_mode_check",
       sql`${t.kbPublicMode} IN ('off','addresses','open')`,

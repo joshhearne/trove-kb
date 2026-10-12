@@ -32,6 +32,17 @@ export function formatNumber(value: number, locale: Locale = DEFAULT_LOCALE): st
   return new Intl.NumberFormat(locale).format(value);
 }
 
+/**
+ * A count of addresses, which can outgrow a number: an IPv6 /64 holds 2^64.
+ * Exact for the locale while it fits; after that a power of two for a block,
+ * and an approximation for anything else.
+ */
+export function formatCount(count: bigint, locale: Locale = DEFAULT_LOCALE): string {
+  if (count <= BigInt(Number.MAX_SAFE_INTEGER)) return formatNumber(Number(count), locale);
+  if ((count & (count - 1n)) === 0n) return `2^${count.toString(2).length - 1}`;
+  return `≈ ${new Intl.NumberFormat(locale, { notation: "scientific", maximumSignificantDigits: 3 }).format(Number(count))}`;
+}
+
 /** "1 location" / "2 locations", with the count formatted for the locale. */
 export function plural(
   count: number,

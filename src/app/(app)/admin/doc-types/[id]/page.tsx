@@ -1,3 +1,6 @@
+import { effectiveMacFormat } from "@/server/fields/values";
+import { macFormatExample } from "@/lib/net/mac";
+import { getMacFormat } from "@/server/services/settings";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -34,7 +37,11 @@ export default async function DocTypePage({ params }: { params: Promise<{ id: st
   const docType = await getDocType(id);
   if (!docType) notFound();
 
-  const [optionLists, allDocTypes] = await Promise.all([listOptionLists(), listDocTypes()]);
+  const [optionLists, allDocTypes, macFormat] = await Promise.all([
+    listOptionLists(),
+    listDocTypes(),
+    getMacFormat(),
+  ]);
   const fieldTypes = EDITABLE_FIELD_TYPES.map((value) => ({
     value,
     label: FIELD_TYPE_LABELS[value],
@@ -119,6 +126,9 @@ export default async function DocTypePage({ params }: { params: Promise<{ id: st
                     {field.optionListId
                       ? ` · ${listNames.get(field.optionListId) ?? "Unknown list"}`
                       : ""}
+                    {field.fieldType === "mac"
+                      ? ` · ${macFormatExample(effectiveMacFormat(field, macFormat))}`
+                      : ""}
                   </p>
                 </div>
 
@@ -178,6 +188,7 @@ export default async function DocTypePage({ params }: { params: Promise<{ id: st
           docTypes={allDocTypes.map((candidate) => ({ id: candidate.id, name: candidate.name }))}
           fieldTypes={fieldTypes}
           optionLists={optionLists.map((list) => ({ id: list.id, name: list.name }))}
+          instanceMacFormat={macFormat}
         />
 
         {archived.length > 0 && (

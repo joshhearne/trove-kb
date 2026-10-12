@@ -74,6 +74,8 @@ export async function buildCompanyExport(
         detail.document.fieldValues ?? {},
         detail.optionLabels,
         detail.linkedTitles,
+        false,
+        detail.macFormat,
       ),
     });
   }

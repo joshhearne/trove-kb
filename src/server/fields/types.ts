@@ -20,6 +20,11 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   date: "Date",
   url: "URL",
   ip: "IP address",
+  network: "Network (CIDR)",
+  ip_range: "IP range",
+  mac: "MAC address",
+  vlan: "VLAN ID",
+  hostname: "Hostname",
   boolean: "Yes / no",
   dropdown: "Dropdown",
   multi_dropdown: "Multi-select dropdown",
@@ -42,6 +47,11 @@ export function usesVault(type: FieldType): boolean {
   return type === "secret_ref";
 }
 
+/** mac is the one type that carries a format of its own. */
+export function usesMacFormat(type: FieldType): boolean {
+  return type === "mac";
+}
+
 export function isEditableType(type: FieldType): boolean {
   return !(UNSUPPORTED_FIELD_TYPES as readonly string[]).includes(type);
 }
@@ -56,6 +66,8 @@ export type FieldDefinition = {
   linkDocTypeId: string | null;
   required: boolean;
   sortOrder: number;
+  /** mac only: the field's own format; null follows the instance setting. */
+  macFormat: string | null;
   archivedAt: Date | null;
   docTypeId: string | null;
   documentId: string | null;

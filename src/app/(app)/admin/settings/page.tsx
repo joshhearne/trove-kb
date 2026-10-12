@@ -2,13 +2,14 @@ import { requireRecentMfa, requireUser } from "@/server/auth/session";
 import {
   getDefaultLocale,
   getDomainCheckPolicy,
+  getMacFormat,
 } from "@/server/services/settings";
 import { env } from "@/lib/env";
 import { getMessages } from "@/i18n/server";
 import { LOCALE_NAMES, LOCALES } from "@/i18n/locales";
 import Link from "next/link";
 import type { Route } from "next";
-import { DefaultLocaleForm, DomainPolicyForm } from "../settings-forms";
+import { DefaultLocaleForm, DomainPolicyForm, MacFormatForm } from "../settings-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function SettingsPage() {
   await requireRecentMfa(await requireUser(), "/admin/settings");
-  const [chosen, t, domainPolicy] = await Promise.all([
+  const [chosen, t, domainPolicy, macFormat] = await Promise.all([
     getDefaultLocale(),
     getMessages(),
     getDomainCheckPolicy(),
+    getMacFormat(),
   ]);
 
   const configuration: [string, string][] = [
@@ -73,6 +75,19 @@ export default async function SettingsPage() {
             </Link>
           </p>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            {t.admin.settings.network}
+          </h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            {t.admin.settings.networkHint}
+          </p>
+        </div>
+
+        <MacFormatForm current={macFormat} />
       </section>
 
       <section className="flex flex-col gap-3">

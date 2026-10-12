@@ -11,6 +11,7 @@ function field(fieldType: FieldType): FieldDefinition {
     linkDocTypeId: null,
     required: false,
     sortOrder: 0,
+    macFormat: null,
     archivedAt: null,
     docTypeId: "t",
     documentId: null,
@@ -101,6 +102,49 @@ describe("renderFieldValue", () => {
   it("never renders a secret", () => {
     expect(renderFieldValue(field("secret_ref"), { itemId: "x" }, labels)).toEqual({
       kind: "empty",
+    });
+  });
+});
+
+describe("network values", () => {
+  it("shows a single address with no block, legacy values included", () => {
+    for (const stored of ["10.0.0.5/32", "10.0.0.5"]) {
+      expect(renderFieldValue(field("ip"), stored, labels)).toMatchObject({
+        kind: "ip",
+        role: "address",
+        address: "10.0.0.5",
+        prefix: 32,
+        addressKind: "host",
+        block: null,
+      });
+    }
+  });
+
+  it("works out the block for an address on a subnet, and for a network", () => {
+    const host = renderFieldValue(field("ip"), "192.168.1.10/24", labels);
+    expect(host).toMatchObject({ role: "address", addressKind: "host_in_network" });
+    expect(host.kind === "ip" && host.block?.network).toBe("192.168.1.0/24");
+
+    const network = renderFieldValue(field("network"), "192.168.1.0/24", labels);
+    expect(network).toMatchObject({
+      kind: "ip",
+      role: "network",
+      block: { usable: "254", broadcast: "192.168.1.255", mask: "255.255.255.0" },
+    });
+  });
+
+  it("shows a MAC address in the format in force now", () => {
+    expect(
+      renderFieldValue(field("mac"), "78:45:58:8A:DC:95", labels, new Map(), "en-US", "hyphen_lower"),
+    ).toEqual({ kind: "mac", text: "78-45-58-8a-dc-95", locallyAdministered: false });
+  });
+
+  it("sizes a range", () => {
+    expect(renderFieldValue(field("ip_range"), "10.0.0.100-10.0.0.199", labels)).toEqual({
+      kind: "range",
+      start: "10.0.0.100",
+      end: "10.0.0.199",
+      size: "100",
     });
   });
 });

@@ -844,3 +844,18 @@ ALTER TABLE instance_branding ADD COLUMN icon_key text;
 ALTER TABLE instance_branding ADD COLUMN icon_mime text;
 ALTER TABLE instance_branding ADD COLUMN alt_icon_key text;
 ALTER TABLE instance_branding ADD COLUMN alt_icon_mime text;
+
+-- ---------- Network fields ----------
+-- IP address (one host, stored addr/prefix), network (a block, snapped to its
+-- boundary), IP range, MAC address, VLAN ID, hostname. A MAC field writes
+-- addresses in its own format, or the instance's when it names none.
+ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
+ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
+  'text','markdown','richtext','number','date','url','ip','network','ip_range','mac','vlan',
+  'hostname','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));
+ALTER TABLE fields ADD COLUMN mac_format text CHECK (mac_format IS NULL OR mac_format IN (
+  'colon_upper','colon_lower','hyphen_upper','hyphen_lower','dot_lower','dot_upper',
+  'bare_upper','bare_lower'));
+ALTER TABLE instance_settings ADD COLUMN mac_format text NOT NULL DEFAULT 'colon_upper'
+  CHECK (mac_format IN ('colon_upper','colon_lower','hyphen_upper','hyphen_lower','dot_lower',
+    'dot_upper','bare_upper','bare_lower'));

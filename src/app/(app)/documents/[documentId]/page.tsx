@@ -215,6 +215,7 @@ export default async function DocumentPage({
                     detail.optionLabels,
                     detail.linkedTitles,
                     locale,
+                    detail.macFormat,
                   );
 
                   if (rendered.kind !== "secret")

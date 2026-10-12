@@ -34,6 +34,7 @@ function field(fieldType: FieldType, overrides: Partial<FieldDefinition> = {}): 
     linkDocTypeId: null,
     required: false,
     sortOrder: 0,
+    macFormat: null,
     archivedAt: null,
     docTypeId: "type-1",
     documentId: null,
@@ -206,5 +207,80 @@ describe("flattenForSearch", () => {
   it("skips blanks", () => {
     const fields = [field("text", { id: "a" }), field("text", { id: "b" })];
     expect(flattenForSearch(fields, { a: "", b: "kept" }, ctx)).toBe("kept");
+  });
+});
+
+describe("network field values", () => {
+  it("saves an IP address alone as /32, and keeps a chosen prefix", () => {
+    expect(value("ip", "192.168.1.10")).toEqual({ ok: true, value: "192.168.1.10/32" });
+    expect(value("ip", "2001:DB8::1")).toEqual({ ok: true, value: "2001:db8::1/128" });
+    expect(value("ip", "192.168.1.10 255.255.255.0")).toEqual({
+      ok: true,
+      value: "192.168.1.10/24",
+    });
+  });
+
+  it("refuses a malformed IP address or prefix", () => {
+    expect(value("ip", "192.168.1.300").ok).toBe(false);
+    expect(value("ip", "192.168.1.10/33").ok).toBe(false);
+    expect(value("ip", "10.0.0.1/24/8").ok).toBe(false);
+  });
+
+  it("snaps a network to its boundary and requires a prefix short of one address", () => {
+    expect(value("network", "192.168.1.77/24")).toEqual({ ok: true, value: "192.168.1.0/24" });
+    expect(value("network", "10.0.0.0/31")).toEqual({ ok: true, value: "10.0.0.0/31" });
+    expect(value("network", "192.168.1.0").ok).toBe(false);
+    expect(value("network", "192.168.1.5/32").ok).toBe(false);
+  });
+
+  it("checks a range's ends", () => {
+    expect(value("ip_range", "10.0.0.100 - 10.0.0.199")).toEqual({
+      ok: true,
+      value: "10.0.0.100-10.0.0.199",
+    });
+    expect(value("ip_range", "10.0.0.199-10.0.0.100").ok).toBe(false);
+  });
+
+  it("writes a MAC address in the field's format, else the instance's", () => {
+    const instance = validateFieldValue(field("mac"), "78-45-58-8A-DC-95", {
+      ...ctx,
+      macFormat: "colon_lower",
+    });
+    expect(instance).toEqual({ ok: true, value: "78:45:58:8a:dc:95" });
+
+    const own = validateFieldValue(
+      field("mac", { macFormat: "dot_upper" }),
+      "78:45:58:8a:dc:95",
+      { ...ctx, macFormat: "colon_lower" },
+    );
+    expect(own).toEqual({ ok: true, value: "7845.588A.DC95" });
+
+    expect(value("mac", "78-45-58-8A-DC").ok).toBe(false);
+  });
+
+  it("keeps a VLAN ID within 1 to 4094", () => {
+    expect(value("vlan", "20")).toEqual({ ok: true, value: 20 });
+    expect(value("vlan", 4095).ok).toBe(false);
+    expect(value("vlan", "1.5").ok).toBe(false);
+  });
+
+  it("lowercases a hostname and drops a trailing dot", () => {
+    expect(value("hostname", "FW01.Example.com.")).toEqual({ ok: true, value: "fw01.example.com" });
+    expect(value("hostname", "bad host").ok).toBe(false);
+    expect(value("hostname", "-fw01").ok).toBe(false);
+  });
+
+  it("indexes a MAC under its other spellings, and an address without its prefix", () => {
+    const mac = field("mac");
+    const ip = field("ip", { id: "field-2" });
+    const text = flattenForSearch([mac, ip], {
+      [mac.id]: "78-45-58-8A-DC-95",
+      [ip.id]: "10.0.0.5/24",
+    });
+    expect(text).toContain("7845588adc95");
+    expect(text).toContain("78:45:58:8a:dc:95");
+    expect(text).toContain("78-45-58-8a-dc-95");
+    expect(text).toContain("7845.588a.dc95");
+    expect(text.split(" ")).toContain("10.0.0.5");
   });
 });

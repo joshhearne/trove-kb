@@ -9,6 +9,8 @@ import { RichTextEditor } from "@/components/fields/rich-text-editor";
 import type { FieldType } from "@/server/fields/types";
 import { useMessages } from "@/i18n/client";
 import { Select } from "@/components/ui/select";
+import { IpControl, IpRangeControl, MacControl } from "@/components/fields/network-controls";
+import type { MacFormat } from "@/lib/net/mac";
 
 export type EditableField = {
   id: string;
@@ -17,6 +19,8 @@ export type EditableField = {
   required: boolean;
   optionListId: string | null;
   linkDocTypeId: string | null;
+  /** mac only: the format in force for this field (its own, else the instance's). */
+  macFormat: MacFormat;
   isLocal: boolean;
 };
 
@@ -152,6 +156,78 @@ export function FieldControl({
             value={asText}
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={invalid}
+          />
+        );
+
+      case "ip":
+      case "network":
+        return (
+          <IpControl
+            id={id}
+            name={name}
+            label={field.label}
+            role={field.fieldType}
+            value={asText}
+            onChange={onChange}
+            invalid={invalid}
+          />
+        );
+
+      case "ip_range":
+        return (
+          <IpRangeControl
+            id={id}
+            name={name}
+            label={field.label}
+            value={asText}
+            onChange={onChange}
+            invalid={invalid}
+          />
+        );
+
+      case "mac":
+        return (
+          <MacControl
+            id={id}
+            name={name}
+            format={field.macFormat}
+            value={asText}
+            onChange={onChange}
+            invalid={invalid}
+          />
+        );
+
+      case "vlan":
+        return (
+          <Input
+            id={id}
+            name={name}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={4094}
+            step={1}
+            placeholder="1–4094"
+            value={asText}
+            onChange={(event) => onChange(event.target.value)}
+            aria-invalid={invalid}
+            className="w-40"
+          />
+        );
+
+      case "hostname":
+        return (
+          <Input
+            id={id}
+            name={name}
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
+            value={asText}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={(event) => onChange(event.target.value.trim().toLowerCase())}
+            aria-invalid={invalid}
+            className="font-mono"
           />
         );
 

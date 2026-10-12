@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { MAC_FORMATS } from "@/lib/net/mac";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { documents, fields } from "@/server/db/schema";
@@ -11,6 +12,7 @@ import { assertInScope, type CompanyScope } from "@/server/auth/company-scope";
 import {
   EDITABLE_FIELD_TYPES,
   usesLinkDocType,
+  usesMacFormat,
   usesOptionList,
   type FieldDefinition,
 } from "@/server/fields/types";
@@ -27,6 +29,7 @@ export const localFieldInputSchema = z
     fieldType: z.enum(EDITABLE_FIELD_TYPES),
     optionListId: z.uuid().optional().nullable(),
     linkDocTypeId: z.uuid().optional().nullable(),
+    macFormat: z.enum(MAC_FORMATS).optional().nullable(),
     required: z.boolean().default(false),
   })
   .refine((v) => !usesOptionList(v.fieldType) || !!v.optionListId, {
@@ -40,6 +43,10 @@ export const localFieldInputSchema = z
   .refine((v) => usesLinkDocType(v.fieldType) || !v.linkDocTypeId, {
     message: "Only a link field points at a doc type",
     path: ["linkDocTypeId"],
+  })
+  .refine((v) => usesMacFormat(v.fieldType) || !v.macFormat, {
+    message: "Only a MAC address field has a format",
+    path: ["macFormat"],
   });
 
 export type LocalFieldInput = z.infer<typeof localFieldInputSchema>;
@@ -52,6 +59,7 @@ const FIELD_COLUMNS = {
   linkDocTypeId: fields.linkDocTypeId,
   required: fields.required,
   sortOrder: fields.sortOrder,
+  macFormat: fields.macFormat,
   archivedAt: fields.archivedAt,
   docTypeId: fields.docTypeId,
   documentId: fields.documentId,
@@ -88,6 +96,7 @@ export async function addLocalField(
         fieldType: data.fieldType,
         optionListId: data.optionListId ?? null,
         linkDocTypeId: data.linkDocTypeId ?? null,
+        macFormat: data.macFormat ?? null,
         required: data.required,
         sortOrder: next,
       })
@@ -160,6 +169,7 @@ export async function promoteField(
         fieldType: data.fieldType,
         optionListId: data.optionListId ?? null,
         linkDocTypeId: data.linkDocTypeId ?? null,
+        macFormat: data.macFormat ?? null,
         required: data.required,
         sortOrder: next,
       })
