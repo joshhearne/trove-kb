@@ -859,3 +859,11 @@ ALTER TABLE fields ADD COLUMN mac_format text CHECK (mac_format IS NULL OR mac_f
 ALTER TABLE instance_settings ADD COLUMN mac_format text NOT NULL DEFAULT 'colon_upper'
   CHECK (mac_format IN ('colon_upper','colon_lower','hyphen_upper','hyphen_lower','dot_lower',
     'dot_upper','bare_upper','bare_lower'));
+
+-- ---------- IP address lists ----------
+-- Several addresses in order, such as DNS servers: a JSON array of the
+-- strings an ip field stores.
+ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
+ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
+  'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
+  'vlan','hostname','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));

@@ -9,7 +9,7 @@ import { RichTextEditor } from "@/components/fields/rich-text-editor";
 import type { FieldType } from "@/server/fields/types";
 import { useMessages } from "@/i18n/client";
 import { Select } from "@/components/ui/select";
-import { IpControl, IpRangeControl, MacControl } from "@/components/fields/network-controls";
+import { IpControl, IpListControl, IpRangeControl, MacControl } from "@/components/fields/network-controls";
 import type { MacFormat } from "@/lib/net/mac";
 
 export type EditableField = {
@@ -37,7 +37,9 @@ export function inputName(fieldId: string): string {
 /** Turns a stored value into what the control should start with. */
 export function toFormValue(fieldType: FieldType, stored: unknown): FieldFormValue {
   if (fieldType === "boolean") return stored === true;
-  if (fieldType === "multi_dropdown") return Array.isArray(stored) ? stored.map(String) : [];
+  if (fieldType === "multi_dropdown" || fieldType === "ip_list") {
+    return Array.isArray(stored) ? stored.map(String) : [];
+  }
   if (fieldType === "secret_ref") {
     // The control posts the item id; the stored value is the reference object.
     if (stored !== null && typeof stored === "object") {
@@ -168,6 +170,18 @@ export function FieldControl({
             label={field.label}
             role={field.fieldType}
             value={asText}
+            onChange={onChange}
+            invalid={invalid}
+          />
+        );
+
+      case "ip_list":
+        return (
+          <IpListControl
+            id={id}
+            name={name}
+            label={field.label}
+            value={selected}
             onChange={onChange}
             invalid={invalid}
           />

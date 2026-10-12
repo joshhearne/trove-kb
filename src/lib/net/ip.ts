@@ -167,6 +167,34 @@ export function splitAddressInput(text: string): { address: string; prefix: stri
   return { address: trimmed, prefix: null };
 }
 
+/**
+ * Several addresses pasted at once, separated by commas, semicolons, new
+ * lines, or spaces: "8.8.8.8, 1.1.1.1" or "8.8.8.8 1.1.1.1". An address
+ * followed by a dotted mask stays one entry: "10.0.0.5 255.255.255.0".
+ */
+export function splitAddressList(text: string): string[] {
+  const out: string[] = [];
+  for (const piece of text.split(/[,;\n]+/)) {
+    const tokens = piece.trim().split(/\s+/).filter((token) => token !== "");
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i] as string;
+      let next = tokens[i + 1];
+      let skip = 1;
+      if (next?.toLowerCase() === "mask") {
+        next = tokens[i + 2];
+        skip = 2;
+      }
+      if (next && !token.includes("/") && !token.includes(":") && maskToPrefix(next) !== null) {
+        out.push(`${token} ${next}`);
+        i += skip;
+      } else {
+        out.push(token);
+      }
+    }
+  }
+  return out;
+}
+
 /** A prefix as typed ("24", "/24", "255.255.255.0") for a family, or null when invalid. */
 export function parsePrefix(text: string, family: IpFamily): number | null {
   const trimmed = text.trim().replace(/^\//, "");

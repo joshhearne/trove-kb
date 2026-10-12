@@ -68,6 +68,10 @@ function resolve(
       return rendered.text;
     case "ip":
       return `${rendered.address}/${rendered.prefix}`;
+    case "ip_list":
+      return rendered.items.map((item) =>
+        item.kind === "ip" ? `${item.address}/${item.prefix}` : item.text,
+      );
     case "range":
       return `${rendered.start}-${rendered.end}`;
     case "url":

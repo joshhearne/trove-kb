@@ -29,6 +29,7 @@ Single container plus Postgres, with an optional bw-serve sidecar for Bitwarden/
 |---|---|
 | text, url | string |
 | ip | `address/prefix` string; a blank prefix is saved as /32 (IPv4) or /128 (IPv6) |
+| ip_list | array of `address/prefix` strings, in order, no repeats, at most 32 |
 | network | `network/prefix` string, host bits cleared; prefix /0–/31 (IPv4) or /0–/127 (IPv6) |
 | ip_range | `first-last` string, same family, first ≤ last |
 | mac | string in the field's MAC format (its own, else the instance's) |
@@ -81,6 +82,10 @@ with no server-only imports, so validation (`fields/values.ts`), rendering
   format as it is typed or pasted, the server does the same on save, and the
   view and the API's `resolved` show stored values in the format in force now.
   Search indexes the bare and colon spellings too.
+- **IP address list** (`ip_list`) is several hosts in order, such as DNS
+  servers, primary first. Each row is an IP address control with its own
+  prefix; rows reorder with arrows, and a paste of several addresses
+  (commas, spaces, new lines) fills a row for each.
 - **IP range** (`ip_range`), **VLAN ID** (`vlan`) and **Hostname** (`hostname`)
   validate their shape and nothing more.
 

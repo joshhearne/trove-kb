@@ -9,6 +9,7 @@ import {
   networkOf,
   parseCidr,
   parseRange,
+  splitAddressList,
   type CidrParseError,
   type RangeParseError,
 } from "@/lib/net/ip";
@@ -75,6 +76,42 @@ const ipSchema = z.string().transform((text, ctx) => {
   }
   return formatCidr(parsed.value);
 });
+
+const MAX_IP_LIST = 32;
+
+/**
+ * Several host addresses in order, such as DNS servers: each one as an ip
+ * field stores it. A string is split the way a paste is.
+ */
+const ipListSchema = z
+  .union([z.string().transform(splitAddressList), z.array(z.string())], {
+    error: "Enter IP addresses",
+  })
+  .transform((items) => items.map((item) => item.trim()).filter((item) => item !== ""))
+  .transform((items, ctx) => {
+    if (items.length > MAX_IP_LIST) {
+      ctx.addIssue({ code: "custom", message: `List at most ${MAX_IP_LIST} addresses` });
+      return z.NEVER;
+    }
+    const out: string[] = [];
+    for (const [index, item] of items.entries()) {
+      const parsed = parseCidr(item, "host");
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Address ${index + 1} (${item}): ${CIDR_ERRORS[parsed.error]}`,
+        });
+        return z.NEVER;
+      }
+      const normalized = formatCidr(parsed.value);
+      if (out.includes(normalized)) {
+        ctx.addIssue({ code: "custom", message: `${item} is listed twice` });
+        return z.NEVER;
+      }
+      out.push(normalized);
+    }
+    return out;
+  });
 
 /**
  * A block of addresses. The prefix is required and stops short of a single
@@ -153,6 +190,8 @@ function baseSchema(field: FieldDefinition, ctx: ValidationContext): z.ZodType {
       return z.url({ protocol: /^https?$/, error: "Enter an http or https URL" }).max(2_000);
     case "ip":
       return ipSchema;
+    case "ip_list":
+      return ipListSchema;
     case "network":
       return networkSchema;
     case "ip_range":
@@ -335,6 +374,12 @@ export function flattenForSearch(
         parts.push(text, text.split("/")[0] ?? "");
         break;
       }
+
+      case "ip_list":
+        if (Array.isArray(value)) {
+          for (const item of value) parts.push(String(item), String(item).split("/")[0] ?? "");
+        }
+        break;
 
       case "ip_range":
         parts.push(String(value).replace("-", " "));

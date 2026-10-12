@@ -37,6 +37,8 @@ Values are keyed by field UUID. Network types are normalized on write and come
 back in that form in `value`:
 - `ip`: `"10.0.0.5/24"`; send `"10.0.0.5"` for a single address (stored as `/32`,
   or `/128` for IPv6). A dotted mask is accepted: `"10.0.0.5 255.255.255.0"`.
+- `ip_list`: `["8.8.8.8/32", "1.1.1.1/32"]`, in order; each entry as `ip` takes it.
+  A single string is split on commas, spaces, and new lines.
 - `network`: `"10.0.0.0/24"`; a prefix is required, and host bits are cleared.
 - `ip_range`: `"192.168.1.100-192.168.1.199"`.
 - `mac`: any common spelling; stored in the field's format (`mac_format` on the

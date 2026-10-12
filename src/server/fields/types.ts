@@ -20,6 +20,7 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   date: "Date",
   url: "URL",
   ip: "IP address",
+  ip_list: "IP address list",
   network: "Network (CIDR)",
   ip_range: "IP range",
   mac: "MAC address",

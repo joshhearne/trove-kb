@@ -570,6 +570,8 @@ export const enUS = {
         "On the document this field comes with a prefix (/nn) selector beside the address. Leave the prefix blank for a single address: it is saved as /32 (IPv4) or /128 (IPv6). Pick one such as /24 to record the subnet the address sits on, and the network block is worked out when the document is saved.",
       networkHint:
         "Holds a whole network, not one address. On the document a prefix is required, from /31 down to /0 for IPv4 (/127 for IPv6), and the network address is taken from it when the document is saved: 192.168.1.77/24 is kept as 192.168.1.0/24.",
+      ipListHint:
+        "Several addresses in order, such as DNS servers: put the primary first. Each one works like an IP address field, with its own prefix selector, and a blank prefix is a single address. Pasting a whole list fills a row for each address.",
       rangeHint:
         "A first and a last address, such as a DHCP pool. Both ends must be IPv4, or both IPv6.",
       macHint:
@@ -603,6 +605,11 @@ export const enUS = {
       networkPreview: (first: string, last: string, usable: string) =>
         `Usable ${first} to ${last} (${usable}).`,
       savedAs: (text: string) => `Saved as ${text}.`,
+      listEntry: (label: string, n: number) => `${label} ${n}`,
+      addAddress: "Add address",
+      moveUp: (entry: string) => `Move ${entry} up`,
+      moveDown: (entry: string) => `Move ${entry} down`,
+      remove: (entry: string) => `Remove ${entry}`,
       rangeStart: (label: string) => `${label}, first address`,
       rangeEnd: (label: string) => `${label}, last address`,
       rangePreview: (count: string) => `${count} addresses.`,

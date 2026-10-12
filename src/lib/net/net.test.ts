@@ -12,6 +12,7 @@ import {
   rangeSize,
   rangeWithin,
   splitAddressInput,
+  splitAddressList,
   type Cidr,
 } from "@/lib/net/ip";
 import { formatMac, isLocallyAdministered, normalizeMac, parseMac } from "@/lib/net/mac";
@@ -170,5 +171,17 @@ describe("MAC addresses", () => {
   it("spots a locally administered address", () => {
     expect(isLocallyAdministered("7845588adc95")).toBe(false);
     expect(isLocallyAdministered("da45588adc95")).toBe(true);
+  });
+});
+
+describe("splitAddressList", () => {
+  it("splits on commas, spaces, and new lines, keeping a mask with its address", () => {
+    expect(splitAddressList("8.8.8.8, 1.1.1.1\n9.9.9.9")).toEqual(["8.8.8.8", "1.1.1.1", "9.9.9.9"]);
+    expect(splitAddressList("8.8.8.8 1.1.1.1")).toEqual(["8.8.8.8", "1.1.1.1"]);
+    expect(splitAddressList("10.0.0.5 255.255.255.0, 10.0.0.6 mask 255.255.0.0")).toEqual([
+      "10.0.0.5 255.255.255.0",
+      "10.0.0.6 255.255.0.0",
+    ]);
+    expect(splitAddressList("2001:4860:4860::8888 2001:4860:4860::8844")).toHaveLength(2);
   });
 });

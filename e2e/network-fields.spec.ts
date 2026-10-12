@@ -27,6 +27,7 @@ test.beforeAll(async ({ browser }) => {
     { label: "DHCP Pool", type: "ip_range" },
     { label: "VLAN", type: "vlan" },
     { label: "Host", type: "hostname" },
+    { label: "DNS Servers", type: "ip_list" },
   ]);
 
   // A MAC field with a format of its own, chosen as it is created.
@@ -158,4 +159,42 @@ test("the instance MAC format applies to fields without their own", async ({ pag
   await page.getByLabel("MAC address format").selectOption("colon_upper");
   await page.getByRole("button", { name: "Update network fields" }).click();
   await expect.poll(() => psql("select mac_format from instance_settings;")).toBe("colon_upper");
+});
+
+test("keeps DNS servers in order, filled from one paste", async ({ page }) => {
+  await page.goto(editUrl);
+
+  const first = page.getByRole("textbox", { name: "DNS Servers 1 address" });
+  await first.focus();
+  // A paste of several addresses fills a row for each.
+  await first.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "1.1.1.1, 8.8.8.8\n9.9.9.9");
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(page.getByRole("textbox", { name: "DNS Servers 3 address" })).toHaveValue("9.9.9.9");
+
+  // 8.8.8.8 becomes the primary.
+  await page.getByRole("button", { name: "Move DNS Servers 2 up" }).click();
+  await expect(first).toHaveValue("8.8.8.8");
+
+  await page.getByRole("button", { name: "Remove DNS Servers 3" }).click();
+  await page.getByRole("button", { name: "Add address" }).click();
+  await page.getByRole("textbox", { name: "DNS Servers 3 address" }).fill("2001:4860:4860::8888");
+
+  await page.getByRole("button", { name: "Save document" }).click();
+  await expect(page).toHaveURL(viewUrl);
+
+  const items = page
+    .locator("dl > div")
+    .filter({ has: page.getByText("DNS Servers", { exact: true }) })
+    .getByRole("listitem");
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toContainText("8.8.8.8");
+  await expect(items.nth(1)).toContainText("1.1.1.1");
+  await expect(items.nth(2)).toContainText("2001:4860:4860::8888");
+
+  // Editing again starts from what was saved, in order.
+  await page.goto(editUrl);
+  await expect(page.getByRole("textbox", { name: "DNS Servers 2 address" })).toHaveValue("1.1.1.1");
 });

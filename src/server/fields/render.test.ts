@@ -148,3 +148,13 @@ describe("network values", () => {
     });
   });
 });
+
+describe("IP address lists", () => {
+  it("renders each address, keeping one that no longer parses as text", () => {
+    expect(renderFieldValue(field("ip_list"), ["8.8.8.8/32", "nonsense"], labels)).toMatchObject({
+      kind: "ip_list",
+      items: [{ kind: "ip", address: "8.8.8.8", block: null }, { kind: "text", text: "nonsense" }],
+    });
+    expect(renderFieldValue(field("ip_list"), [], labels)).toEqual({ kind: "empty" });
+  });
+});

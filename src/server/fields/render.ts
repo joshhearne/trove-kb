@@ -37,20 +37,25 @@ export type RenderedBlock = {
   total: string;
 };
 
+/** One address or network, worked out. */
+export type IpRendered = {
+  kind: "ip";
+  /** What the field holds: one address, or a whole network. */
+  role: "address" | "network";
+  address: string;
+  prefix: number;
+  /** For an address: alone, on a subnet, or the subnet's own address. */
+  addressKind: AddressKind;
+  /** Null for a single address (/32, /128): there is no block to describe. */
+  block: RenderedBlock | null;
+};
+
 export type RenderedValue =
   | { kind: "empty" }
   | { kind: "code"; text: string }
-  | {
-      kind: "ip";
-      /** What the field holds: one address, or a whole network. */
-      role: "address" | "network";
-      address: string;
-      prefix: number;
-      /** For an address: alone, on a subnet, or the subnet's own address. */
-      addressKind: AddressKind;
-      /** Null for a single address (/32, /128): there is no block to describe. */
-      block: RenderedBlock | null;
-    }
+  | IpRendered
+  /** Several addresses in order; one that no longer parses shows as text. */
+  | { kind: "ip_list"; items: (IpRendered | { kind: "text"; text: string })[] }
   | { kind: "range"; start: string; end: string; size: string }
   | { kind: "mac"; text: string; locallyAdministered: boolean }
   | { kind: "text"; text: string }
@@ -97,30 +102,14 @@ export function renderFieldValue(
       return { kind: "text", text: value === true ? "Yes" : "No" };
 
     case "ip":
-    case "network": {
-      // Older ip values were stored without a prefix: they are one address.
-      const parsed = parseCidr(String(value), "host");
-      if (!parsed.ok) return { kind: "text", text: String(value) };
-      const cidr = parsed.value;
-      const role = field.fieldType === "network" ? "network" : "address";
-      const kind = addressKind(cidr);
-      const block = role === "network" || kind !== "host" ? describeBlock(cidr) : null;
+    case "network":
+      return renderIp(String(value), field.fieldType === "network" ? "network" : "address", locale);
+
+    case "ip_list": {
+      if (!Array.isArray(value) || value.length === 0) return { kind: "empty" };
       return {
-        kind: "ip",
-        role,
-        address: formatAddress(cidr.address),
-        prefix: cidr.prefix,
-        addressKind: kind,
-        block: block && {
-          network: block.network,
-          mask: block.mask,
-          wildcard: block.wildcard,
-          broadcast: block.broadcast,
-          firstUsable: block.firstUsable,
-          lastUsable: block.lastUsable,
-          usable: formatCount(block.usable, locale),
-          total: formatCount(block.total, locale),
-        },
+        kind: "ip_list",
+        items: value.map((item) => renderIp(String(item), "address", locale)),
       };
     }
 
@@ -197,3 +186,34 @@ export function renderFieldValue(
   }
 }
 
+
+/** An address or a network, with its block when it has one. */
+function renderIp(
+  value: string,
+  role: "address" | "network",
+  locale: Locale,
+): IpRendered | { kind: "text"; text: string } {
+  // Older ip values were stored without a prefix: they are one address.
+  const parsed = parseCidr(value, "host");
+  if (!parsed.ok) return { kind: "text", text: value };
+  const cidr = parsed.value;
+  const kind = addressKind(cidr);
+  const block = role === "network" || kind !== "host" ? describeBlock(cidr) : null;
+  return {
+    kind: "ip",
+    role,
+    address: formatAddress(cidr.address),
+    prefix: cidr.prefix,
+    addressKind: kind,
+    block: block && {
+      network: block.network,
+      mask: block.mask,
+      wildcard: block.wildcard,
+      broadcast: block.broadcast,
+      firstUsable: block.firstUsable,
+      lastUsable: block.lastUsable,
+      usable: formatCount(block.usable, locale),
+      total: formatCount(block.total, locale),
+    },
+  };
+}

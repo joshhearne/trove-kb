@@ -17,6 +17,21 @@ export function FieldValue({ value }: { value: RenderedValue }) {
     case "ip":
       return <IpValueView value={value} />;
 
+    case "ip_list":
+      return (
+        <ol className="flex flex-col gap-2">
+          {value.items.map((item, index) => (
+            <li key={index}>
+              {item.kind === "ip" ? (
+                <IpValueView value={item} />
+              ) : (
+                <span className="text-sm">{item.text}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      );
+
     case "range":
       return <IpRangeView value={value} />;
 

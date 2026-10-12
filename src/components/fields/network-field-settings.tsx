@@ -41,6 +41,8 @@ export function NetworkFieldSettings({
   switch (fieldType) {
     case "ip":
       return note(net.ipHint);
+    case "ip_list":
+      return note(net.ipListHint);
     case "network":
       return note(net.networkHint);
     case "ip_range":

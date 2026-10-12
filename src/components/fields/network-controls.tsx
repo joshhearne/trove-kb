@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type ClipboardEvent } from "react";
+import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -17,6 +19,7 @@ import {
   prefixToMask,
   rangeSize,
   splitAddressInput,
+  splitAddressList,
   splitRangeInput,
   type IpFamily,
 } from "@/lib/net/ip";
@@ -61,14 +64,18 @@ export function IpControl({
   value,
   onChange,
   invalid,
+  onPasteList,
 }: {
   id: string;
-  name: string;
+  /** Omitted when a list posts the value instead. */
+  name?: string;
   label: string;
   role: "ip" | "network";
   value: string;
   onChange: (next: string) => void;
   invalid: boolean;
+  /** In a list, a paste of several addresses goes to the list. */
+  onPasteList?: (addresses: string[]) => void;
 }) {
   const t = useMessages();
   const locale = useLocale();
@@ -110,12 +117,21 @@ export function IpControl({
   }
 
   function onPaste(event: ClipboardEvent<HTMLInputElement>) {
-    if (absorb(event.clipboardData.getData("text"))) event.preventDefault();
+    const text = event.clipboardData.getData("text");
+    if (onPasteList) {
+      const addresses = splitAddressList(text);
+      if (addresses.length > 1) {
+        event.preventDefault();
+        onPasteList(addresses);
+        return;
+      }
+    }
+    if (absorb(text)) event.preventDefault();
   }
 
   return (
     <div className="flex flex-col gap-1">
-      <input type="hidden" name={name} value={joinStored(address, prefix)} />
+      {name && <input type="hidden" name={name} value={joinStored(address, prefix)} />}
       <div className="flex items-stretch gap-2">
         <Input
           id={id}
@@ -183,6 +199,127 @@ export function IpControl({
       ? usable
       : `${t.editor.net.savedAs(snapped)} ${usable}`;
   }
+}
+
+/** Row keys for IpListControl: unique for the page's life, never reused. */
+let listRowKey = 0;
+function row(text: string): { key: number; text: string } {
+  return { key: listRowKey++, text };
+}
+
+/**
+ * Several addresses in order, such as DNS servers, primary first. Each row
+ * works like an IP address field; a paste of several addresses fills a row
+ * for each. The form posts one value per address, empty rows left out.
+ */
+export function IpListControl({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  invalid,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  invalid: boolean;
+}) {
+  const t = useMessages();
+  const [rows, setRows] = useState(() => (value.length === 0 ? [row("")] : value.map(row)));
+
+  function update(next: { key: number; text: string }[]) {
+    const kept = next.length === 0 ? [row("")] : next;
+    setRows(kept);
+    onChange(kept.map((r) => r.text.trim()).filter((text) => text !== ""));
+  }
+
+  function move(index: number, by: -1 | 1) {
+    const next = [...rows];
+    const [moved] = next.splice(index, 1);
+    if (moved) next.splice(index + by, 0, moved);
+    update(next);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Keeps the field present when every row is cleared. */}
+      <input type="hidden" name={name} value="" />
+      {rows.map((r) =>
+        r.text.trim() === "" ? null : <input key={r.key} type="hidden" name={name} value={r.text.trim()} />,
+      )}
+      <ol className="flex flex-col gap-2">
+        {rows.map((r, index) => {
+          const entry = t.editor.net.listEntry(label, index + 1);
+          return (
+            <li key={r.key} className="flex items-start gap-1">
+              <div className="min-w-0 flex-1">
+                <IpControl
+                  id={index === 0 ? id : `${id}-${r.key}`}
+                  label={entry}
+                  role="ip"
+                  value={r.text}
+                  invalid={invalid}
+                  onChange={(text) =>
+                    update(rows.map((other) => (other.key === r.key ? { ...other, text } : other)))
+                  }
+                  onPasteList={(addresses) =>
+                    update([
+                      ...rows.slice(0, index),
+                      ...addresses.map(row),
+                      ...rows.slice(index + 1).filter((other) => other.text.trim() !== ""),
+                    ])
+                  }
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t.editor.net.moveUp(entry)}
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+              >
+                <ArrowUp className="size-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t.editor.net.moveDown(entry)}
+                disabled={index === rows.length - 1}
+                onClick={() => move(index, 1)}
+              >
+                <ArrowDown className="size-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t.editor.net.remove(entry)}
+                onClick={() => update(rows.filter((other) => other.key !== r.key))}
+              >
+                <X className="size-4" aria-hidden />
+              </Button>
+            </li>
+          );
+        })}
+      </ol>
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setRows([...rows, row("")])}
+        >
+          <Plus className="size-4" aria-hidden />
+          {t.editor.net.addAddress}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /** A first and a last address, posted as one "first-last" string. */

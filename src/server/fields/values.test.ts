@@ -284,3 +284,37 @@ describe("network field values", () => {
     expect(text.split(" ")).toContain("10.0.0.5");
   });
 });
+
+describe("IP address lists", () => {
+  it("keeps the order and saves each address as an IP address field does", () => {
+    expect(value("ip_list", ["8.8.8.8", "1.1.1.1/32", "10.0.0.5 255.255.255.0"])).toEqual({
+      ok: true,
+      value: ["8.8.8.8/32", "1.1.1.1/32", "10.0.0.5/24"],
+    });
+  });
+
+  it("splits a string the way a paste is split", () => {
+    expect(value("ip_list", "8.8.8.8, 2001:4860:4860::8888")).toEqual({
+      ok: true,
+      value: ["8.8.8.8/32", "2001:4860:4860::8888/128"],
+    });
+  });
+
+  it("drops blank rows, and treats an empty list as blank", () => {
+    expect(value("ip_list", ["", "8.8.8.8", " "])).toEqual({ ok: true, value: ["8.8.8.8/32"] });
+    expect(value("ip_list", [])).toEqual({ ok: true, value: null });
+  });
+
+  it("names the address that is wrong, and refuses a repeat", () => {
+    const bad = value("ip_list", ["8.8.8.8", "8.8.8.300"]);
+    expect(bad.ok === false && bad.message).toContain("Address 2 (8.8.8.300)");
+    const repeat = value("ip_list", ["8.8.8.8", "8.8.8.8/32"]);
+    expect(repeat.ok === false && repeat.message).toContain("listed twice");
+  });
+
+  it("indexes each address with and without its prefix", () => {
+    const list = field("ip_list");
+    const text = flattenForSearch([list], { [list.id]: ["8.8.8.8/32", "1.1.1.1/32"] });
+    expect(text.split(" ")).toEqual(expect.arrayContaining(["8.8.8.8", "1.1.1.1"]));
+  });
+});
