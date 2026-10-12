@@ -44,6 +44,9 @@ back in that form in `value`:
 - `mac`: any common spelling; stored in the field's format (`mac_format` on the
   field, else the instance's). `resolved` shows it in the format in force now.
 - `vlan`: a number from 1 to 4094. `hostname`: lowercased.
+- `port`: `"443/tcp"`, `"53/tcp+udp"`, or `"8443"` with no protocol. A number,
+  `"tcp 443"`, or a service name such as `"https"` is accepted.
+- `port_range`: `"5060-5080/udp"`; a range of one port is stored as that port.
 
 ## Company scope
 A key is created with either every company or a named set. Everything below is

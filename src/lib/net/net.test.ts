@@ -16,6 +16,14 @@ import {
   type Cidr,
 } from "@/lib/net/ip";
 import { formatMac, isLocallyAdministered, normalizeMac, parseMac } from "@/lib/net/mac";
+import {
+  formatPortSpec,
+  joinPortStored,
+  parsePortSpec,
+  portCount,
+  serviceName,
+  splitPortStored,
+} from "@/lib/net/port";
 
 function cidr(text: string): Cidr {
   const parsed = parseCidr(text, "host");
@@ -183,5 +191,53 @@ describe("splitAddressList", () => {
       "10.0.0.6 255.255.0.0",
     ]);
     expect(splitAddressList("2001:4860:4860::8888 2001:4860:4860::8844")).toHaveLength(2);
+  });
+});
+
+describe("ports", () => {
+  it("reads the common spellings", () => {
+    const read = (text: string, range = true) => {
+      const parsed = parsePortSpec(text, range);
+      return parsed.ok ? formatPortSpec(parsed.value) : parsed.error;
+    };
+    expect(read("443")).toBe("443");
+    expect(read("443/TCP")).toBe("443/tcp");
+    expect(read("tcp/443")).toBe("443/tcp");
+    expect(read("UDP 53")).toBe("53/udp");
+    expect(read("udp:53")).toBe("53/udp");
+    expect(read("53 tcp/udp")).toBe("53/tcp+udp");
+    expect(read("5060-5080/udp")).toBe("5060-5080/udp");
+    expect(read("5060:5080 udp")).toBe("5060-5080/udp");
+    expect(read("5060 – 5080")).toBe("5060-5080");
+    expect(read("5060-5060")).toBe("5060");
+    expect(read("https")).toBe("443/tcp");
+    expect(read("dns/udp")).toBe("53/udp");
+  });
+
+  it("refuses what is not a port", () => {
+    const error = (text: string, range = true) => {
+      const parsed = parsePortSpec(text, range);
+      return parsed.ok ? null : parsed.error;
+    };
+    expect(error("0")).toBe("number");
+    expect(error("65536")).toBe("number");
+    expect(error("5080-5060")).toBe("order");
+    expect(error("5060-5080", false)).toBe("range");
+    expect(error("http-ish")).toBe("shape");
+    expect(error("")).toBe("shape");
+  });
+
+  it("names a well-known service and counts a range", () => {
+    expect(serviceName(3389)).toBe("RDP");
+    expect(serviceName(4444)).toBeNull();
+    expect(portCount({ start: 5060, end: 5080, protocol: null })).toBe(21);
+  });
+
+  it("splits and joins what the controls hold", () => {
+    expect(splitPortStored("5060-5080/udp")).toEqual({ start: "5060", end: "5080", protocol: "udp" });
+    expect(splitPortStored("443")).toEqual({ start: "443", end: "", protocol: "" });
+    expect(joinPortStored("443", "", "tcp")).toBe("443/tcp");
+    expect(joinPortStored("5060", "5060", "")).toBe("5060");
+    expect(joinPortStored("", "", "tcp")).toBe("");
   });
 });

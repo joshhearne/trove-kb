@@ -2,7 +2,7 @@
 
 Vendor (company scope): Name, Type [dropdown: Vendor Types], Support Phone, Support URL, Account #, Notes (markdown)
 ISP (location scope): Provider [dropdown: Internet Providers], Circuit Type [dropdown], Circuit ID, Static IPs (network), WAN IP (ip), Gateway (ip), Speed Down/Up, Account #, Support Notes (markdown)
-Firewall (location): Make [dropdown: Firewall Vendors], Model, Serial, Firmware, LAN IP (ip), WAN IP (ip), MAC (mac), WAN [doc_link: ISP], Admin URL, Credentials [secret_ref], Notes
+Firewall (location): Make [dropdown: Firewall Vendors], Model, Serial, Firmware, LAN IP (ip), WAN IP (ip), MAC (mac), WAN [doc_link: ISP], Admin URL, VPN Port (port), Credentials [secret_ref], Notes
 Switch (location): Make, Model, Serial, Mgmt IP (ip), Mgmt VLAN (vlan), MAC (mac), VLANs (markdown), Uplinks (markdown)
 Wi-Fi (location): SSID, Security [dropdown], VLAN (vlan), Controller/AP Model, Credentials [secret_ref]
 Printer (location): Make, Model, IP (ip), Hostname (hostname), MAC (mac), Serial, Driver URL, Supplies Vendor [doc_link: Vendor]

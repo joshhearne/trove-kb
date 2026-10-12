@@ -6,6 +6,7 @@ import { useMessages } from "@/i18n/client";
 type IpValue = Extract<RenderedValue, { kind: "ip" }>;
 type RangeValue = Extract<RenderedValue, { kind: "range" }>;
 type MacValue = Extract<RenderedValue, { kind: "mac" }>;
+type PortValue = Extract<RenderedValue, { kind: "port" }>;
 
 const badgeClass =
   "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]";
@@ -95,6 +96,25 @@ export function MacValueView({ value }: { value: MacValue }) {
         <span className="text-xs text-[var(--muted-foreground)]">
           {t.editor.net.locallyAdministered}
         </span>
+      )}
+    </span>
+  );
+}
+
+/** A port or a range, its protocol badged, with the service or the count. */
+export function PortValueView({ value }: { value: PortValue }) {
+  const t = useMessages();
+  const net = t.editor.net;
+  return (
+    <span className="flex flex-wrap items-baseline gap-2">
+      <span className="font-mono text-sm">{value.ports}</span>
+      {value.protocol && <span className={badgeClass}>{net.protocols[value.protocol]}</span>}
+      {value.service ? (
+        <span className="text-xs text-[var(--muted-foreground)]">{value.service}</span>
+      ) : (
+        value.count && (
+          <span className="text-xs text-[var(--muted-foreground)]">{net.portCount(value.count)}</span>
+        )
       )}
     </span>
   );

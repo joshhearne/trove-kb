@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { RenderedValue } from "@/server/fields/render";
-import { IpRangeView, IpValueView, MacValueView } from "@/components/fields/network-value";
+import {
+  IpRangeView,
+  IpValueView,
+  MacValueView,
+  PortValueView,
+} from "@/components/fields/network-value";
 
 /** Read-only rendering of one already-resolved field value. */
 export function FieldValue({ value }: { value: RenderedValue }) {
@@ -37,6 +42,9 @@ export function FieldValue({ value }: { value: RenderedValue }) {
 
     case "mac":
       return <MacValueView value={value} />;
+
+    case "port":
+      return <PortValueView value={value} />;
 
     case "url":
       return (

@@ -172,6 +172,7 @@ const DOC_TYPES: NewDocType[] = [
       { label: "MAC", fieldType: "mac" },
       { label: "WAN", fieldType: "doc_link", linksTo: "ISP" },
       { label: "Admin URL", fieldType: "url" },
+      { label: "VPN Port", fieldType: "port" },
       { label: "Credentials", fieldType: "secret_ref" },
       { label: "Notes", fieldType: "markdown" },
     ],

@@ -579,6 +579,10 @@ export const enUS = {
       vlanHint: "A whole number from 1 to 4094.",
       hostnameHint:
         "A short name such as fw01, or a fully qualified one such as fw01.example.com. Saved in lowercase.",
+      portHint:
+        "One port from 1 to 65535, with a protocol selector beside it (TCP, UDP, or both; it may be left blank). Pasting 443/tcp fills both, and a known service name such as https is read as its port.",
+      portRangeHint:
+        "A first and a last port, such as 5060-5080 for a phone system, with a protocol selector beside them. Leave the last port blank for a single port.",
       macFormat: "MAC address format",
       macFormatDefault: (example: string) => `Instance default (${example})`,
       macFormats: {
@@ -613,6 +617,16 @@ export const enUS = {
       rangeStart: (label: string) => `${label}, first address`,
       rangeEnd: (label: string) => `${label}, last address`,
       rangePreview: (count: string) => `${count} addresses.`,
+      port: (label: string) => `${label} port`,
+      portStart: (label: string) => `${label}, first port`,
+      portEnd: (label: string) => `${label}, last port`,
+      protocol: (label: string) => `${label} protocol`,
+      anyProtocol: "Protocol…",
+      protocols: { tcp: "TCP", udp: "UDP", "tcp+udp": "TCP and UDP" },
+      portControlHint: "Pasting 443/tcp or tcp 443 fills both.",
+      portRangeControlHint: "Pasting 5060-5080/udp fills all three.",
+      servicePreview: (service: string) => `Usually ${service}.`,
+      portCount: (count: string) => `${count} ports`,
       macPreview: (example: string) => `Written as ${example}.`,
       badgeAddress: "Address",
       badgeNetwork: "Network",

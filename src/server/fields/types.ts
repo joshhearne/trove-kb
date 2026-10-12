@@ -26,6 +26,8 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   mac: "MAC address",
   vlan: "VLAN ID",
   hostname: "Hostname",
+  port: "Port",
+  port_range: "Port range",
   boolean: "Yes / no",
   dropdown: "Dropdown",
   multi_dropdown: "Multi-select dropdown",

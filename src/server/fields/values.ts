@@ -20,6 +20,13 @@ import {
   parseMac,
   type MacFormat,
 } from "@/lib/net/mac";
+import {
+  formatPortSpec,
+  MAX_PORT,
+  parsePortSpec,
+  serviceName,
+  type PortParseError,
+} from "@/lib/net/port";
 
 /** Option items available to a dropdown field, keyed by option list id. */
 export type OptionIndex = Map<string, { id: string; label: string }[]>;
@@ -143,6 +150,34 @@ const ipRangeSchema = z.string().transform((text, ctx) => {
   return formatRange(parsed.value);
 });
 
+const PORT_ERRORS: Record<PortParseError, string> = {
+  shape: "Enter a port such as 443, or 443/tcp",
+  number: `A port runs from 1 to ${MAX_PORT}`,
+  order: "The range ends before it starts",
+  range: "Enter one port. Use a Port range field for several",
+};
+
+/**
+ * One port, or (for port_range) a run of them, with an optional protocol.
+ * The API may send a bare number.
+ */
+function portSchema(allowRange: boolean) {
+  return z.union([z.string(), z.number()], { error: PORT_ERRORS.shape }).transform((raw, ctx) => {
+    const parsed = parsePortSpec(String(raw), allowRange);
+    if (!parsed.ok) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          allowRange && parsed.error === "shape"
+            ? "Enter a port or a range such as 5060-5080, or 5060-5080/udp"
+            : PORT_ERRORS[parsed.error],
+      });
+      return z.NEVER;
+    }
+    return formatPortSpec(parsed.value);
+  });
+}
+
 const HOST_LABEL = /^(?!-)[a-z0-9_-]{1,63}(?<!-)$/;
 
 /** A hostname or fully qualified name; lowercased, trailing dot dropped. */
@@ -214,6 +249,10 @@ function baseSchema(field: FieldDefinition, ctx: ValidationContext): z.ZodType {
       return vlanSchema;
     case "hostname":
       return hostnameSchema;
+    case "port":
+      return portSchema(false);
+    case "port_range":
+      return portSchema(true);
     case "boolean":
       return z.boolean();
     case "dropdown":
@@ -384,6 +423,23 @@ export function flattenForSearch(
       case "ip_range":
         parts.push(String(value).replace("-", " "));
         break;
+
+      case "port":
+      case "port_range": {
+        // Each number on its own, the protocol, and the service's name.
+        const parsed = parsePortSpec(String(value), true);
+        if (!parsed.ok) {
+          parts.push(String(value));
+          break;
+        }
+        const { start, end, protocol } = parsed.value;
+        parts.push(String(start));
+        if (end !== start) parts.push(String(end));
+        if (protocol) parts.push(...protocol.split("+"));
+        const service = start === end ? serviceName(start) : null;
+        if (service) parts.push(service);
+        break;
+      }
 
       case "mac": {
         // Every common spelling finds it, since the search parser splits each

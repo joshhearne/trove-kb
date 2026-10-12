@@ -14,6 +14,7 @@ import {
   type AddressKind,
 } from "@/lib/net/ip";
 import { formatMac, isLocallyAdministered, parseMac, type MacFormat } from "@/lib/net/mac";
+import { formatPortSpec, parsePortSpec, portCount, serviceName, type Protocol } from "@/lib/net/port";
 import { effectiveMacFormat } from "@/server/fields/values";
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -58,6 +59,18 @@ export type RenderedValue =
   | { kind: "ip_list"; items: (IpRendered | { kind: "text"; text: string })[] }
   | { kind: "range"; start: string; end: string; size: string }
   | { kind: "mac"; text: string; locallyAdministered: boolean }
+  | {
+      kind: "port";
+      /** As stored and sent by the API: "443/tcp", "5060-5080/udp". */
+      value: string;
+      /** "443" or "5060–5080", without the protocol. */
+      ports: string;
+      protocol: Protocol | null;
+      /** The well-known service on a single port, such as HTTPS. */
+      service: string | null;
+      /** How many ports a range covers; null for one port. */
+      count: string | null;
+    }
   | { kind: "text"; text: string }
   | { kind: "url"; href: string }
   | { kind: "html"; html: string }
@@ -137,6 +150,22 @@ export function renderFieldValue(
 
     case "hostname":
       return { kind: "code", text: String(value) };
+
+    case "port":
+    case "port_range": {
+      const parsed = parsePortSpec(String(value), true);
+      if (!parsed.ok) return { kind: "text", text: String(value) };
+      const spec = parsed.value;
+      const single = spec.start === spec.end;
+      return {
+        kind: "port",
+        value: formatPortSpec(spec),
+        ports: single ? String(spec.start) : `${spec.start}–${spec.end}`,
+        protocol: spec.protocol,
+        service: single ? serviceName(spec.start) : null,
+        count: single ? null : formatCount(BigInt(portCount(spec)), locale),
+      };
+    }
 
     case "vlan":
       return { kind: "text", text: String(value) };

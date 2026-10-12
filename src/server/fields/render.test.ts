@@ -158,3 +158,22 @@ describe("IP address lists", () => {
     expect(renderFieldValue(field("ip_list"), [], labels)).toEqual({ kind: "empty" });
   });
 });
+
+describe("ports", () => {
+  it("renders a port with its service, and a range with its count", () => {
+    expect(renderFieldValue(field("port"), "443/tcp", labels)).toEqual({
+      kind: "port",
+      value: "443/tcp",
+      ports: "443",
+      protocol: "tcp",
+      service: "HTTPS",
+      count: null,
+    });
+    expect(renderFieldValue(field("port_range"), "5060-5080/udp", labels)).toMatchObject({
+      kind: "port",
+      ports: "5060–5080",
+      service: null,
+      count: "21",
+    });
+  });
+});

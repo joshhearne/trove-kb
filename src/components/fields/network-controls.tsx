@@ -24,6 +24,14 @@ import {
   type IpFamily,
 } from "@/lib/net/ip";
 import { macFormatExample, normalizeMac, parseMac, type MacFormat } from "@/lib/net/mac";
+import {
+  joinPortStored,
+  parsePortSpec,
+  portCount,
+  PROTOCOLS,
+  serviceName,
+  splitPortStored,
+} from "@/lib/net/port";
 
 const selectClass =
   "h-10 rounded-md border bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
@@ -408,6 +416,135 @@ export function IpRangeControl({
           {t.editor.net.rangePreview(formatCount(rangeSize(parsed.value), locale))}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * A port, or for "range" a first and last port, with a protocol selector.
+ * The form posts one "443/tcp" or "5060-5080/udp" string.
+ */
+export function PortControl({
+  id,
+  name,
+  label,
+  role,
+  value,
+  onChange,
+  invalid,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  role: "port" | "range";
+  value: string;
+  onChange: (next: string) => void;
+  invalid: boolean;
+}) {
+  const t = useMessages();
+  const locale = useLocale();
+  const net = t.editor.net;
+  const initial = splitPortStored(value);
+  const [start, setStart] = useState(initial.start);
+  const [end, setEnd] = useState(initial.end);
+  const [protocol, setProtocol] = useState(initial.protocol);
+
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    if (value !== joinPortStored(start, end, protocol)) {
+      const next = splitPortStored(value);
+      setStart(next.start);
+      setEnd(next.end);
+      setProtocol(next.protocol);
+    }
+  }
+
+  function update(a: string, b: string, p: string) {
+    setStart(a);
+    setEnd(b);
+    setProtocol(p);
+    onChange(joinPortStored(a, b, p));
+  }
+
+  /** "443/tcp", "tcp 443", "5060-5080/udp", or "https" fills every control. */
+  function onPaste(event: ClipboardEvent<HTMLInputElement>) {
+    const parsed = parsePortSpec(event.clipboardData.getData("text"), role === "range");
+    if (!parsed.ok) return;
+    event.preventDefault();
+    const spec = parsed.value;
+    update(
+      String(spec.start),
+      spec.end === spec.start ? "" : String(spec.end),
+      spec.protocol ?? protocol,
+    );
+  }
+
+  const numberProps = {
+    inputMode: "numeric" as const,
+    autoComplete: "off",
+    spellCheck: false,
+    onPaste,
+    "aria-invalid": invalid,
+    className: "w-28 font-mono",
+  };
+
+  const parsed = parsePortSpec(joinPortStored(start, end, protocol), role === "range");
+  let preview: string | null = null;
+  if (parsed.ok) {
+    const spec = parsed.value;
+    const service = spec.start === spec.end ? serviceName(spec.start) : null;
+    if (spec.start !== spec.end) {
+      preview = net.portCount(formatCount(BigInt(portCount(spec)), locale));
+    } else if (service) {
+      preview = net.servicePreview(service);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <input type="hidden" name={name} value={joinPortStored(start, end, protocol)} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          id={id}
+          aria-label={role === "range" ? net.portStart(label) : net.port(label)}
+          value={start}
+          placeholder={role === "range" ? "5060" : "443"}
+          onChange={(event) => update(event.target.value, end, protocol)}
+          {...numberProps}
+        />
+        {role === "range" && (
+          <>
+            <span aria-hidden className="text-[var(--muted-foreground)]">
+              –
+            </span>
+            <Input
+              aria-label={net.portEnd(label)}
+              value={end}
+              placeholder="5080"
+              onChange={(event) => update(start, event.target.value, protocol)}
+              {...numberProps}
+            />
+          </>
+        )}
+        <Select
+          aria-label={net.protocol(label)}
+          value={protocol}
+          onChange={(event) => update(start, end, event.target.value)}
+          aria-invalid={invalid}
+          className={`${selectClass} w-36 shrink-0`}
+        >
+          <option value="">{net.anyProtocol}</option>
+          {PROTOCOLS.map((p) => (
+            <option key={p} value={p}>
+              {net.protocols[p]}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <p className={hintClass} aria-live="polite">
+        {preview ?? (role === "range" ? net.portRangeControlHint : net.portControlHint)}
+      </p>
     </div>
   );
 }

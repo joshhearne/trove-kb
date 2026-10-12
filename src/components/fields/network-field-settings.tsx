@@ -51,6 +51,10 @@ export function NetworkFieldSettings({
       return note(net.vlanHint);
     case "hostname":
       return note(net.hostnameHint);
+    case "port":
+      return note(net.portHint);
+    case "port_range":
+      return note(net.portRangeHint);
     case "mac":
       return (
         <Field id={`${idPrefix}-mac-format`} label={net.macFormat} hint={net.macHint}>

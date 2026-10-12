@@ -35,6 +35,8 @@ Single container plus Postgres, with an optional bw-serve sidecar for Bitwarden/
 | mac | string in the field's MAC format (its own, else the instance's) |
 | vlan | number, 1–4094 |
 | hostname | lowercase string, trailing dot dropped |
+| port | `port[/protocol]` string, 1–65535; protocol `tcp`, `udp`, or `tcp+udp` |
+| port_range | `first-last[/protocol]` string, first ≤ last; a range of one is saved as one port |
 | markdown | markdown source string |
 | richtext | sanitized HTML string (sanitize server-side on write) |
 | number | number |
@@ -86,6 +88,10 @@ with no server-only imports, so validation (`fields/values.ts`), rendering
   servers, primary first. Each row is an IP address control with its own
   prefix; rows reorder with arrows, and a paste of several addresses
   (commas, spaces, new lines) fills a row for each.
+- **Port** (`port`) and **Port range** (`port_range`) sit beside a protocol
+  selector, which may stay blank. `src/lib/net/port.ts` reads "443/tcp",
+  "tcp 443", "udp:53", "5060:5080 udp", and well-known service names
+  ("https" is 443/tcp); the view names the service on a well-known port.
 - **IP range** (`ip_range`), **VLAN ID** (`vlan`) and **Hostname** (`hostname`)
   validate their shape and nothing more.
 

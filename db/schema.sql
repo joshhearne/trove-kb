@@ -867,3 +867,11 @@ ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
 ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
   'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
   'vlan','hostname','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));
+
+-- ---------- Ports ----------
+-- One TCP/UDP port or a range of them, with an optional protocol:
+-- '443/tcp', '5060-5080/udp', '8443'.
+ALTER TABLE fields DROP CONSTRAINT fields_field_type_check;
+ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
+  'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
+  'vlan','hostname','port','port_range','boolean','dropdown','multi_dropdown','doc_link','secret_ref'));

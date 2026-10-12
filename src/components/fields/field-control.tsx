@@ -9,7 +9,13 @@ import { RichTextEditor } from "@/components/fields/rich-text-editor";
 import type { FieldType } from "@/server/fields/types";
 import { useMessages } from "@/i18n/client";
 import { Select } from "@/components/ui/select";
-import { IpControl, IpListControl, IpRangeControl, MacControl } from "@/components/fields/network-controls";
+import {
+  IpControl,
+  IpListControl,
+  IpRangeControl,
+  MacControl,
+  PortControl,
+} from "@/components/fields/network-controls";
 import type { MacFormat } from "@/lib/net/mac";
 
 export type EditableField = {
@@ -242,6 +248,20 @@ export function FieldControl({
             onBlur={(event) => onChange(event.target.value.trim().toLowerCase())}
             aria-invalid={invalid}
             className="font-mono"
+          />
+        );
+
+      case "port":
+      case "port_range":
+        return (
+          <PortControl
+            id={id}
+            name={name}
+            label={field.label}
+            role={field.fieldType === "port" ? "port" : "range"}
+            value={asText}
+            onChange={onChange}
+            invalid={invalid}
           />
         );
 

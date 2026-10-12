@@ -28,6 +28,8 @@ test.beforeAll(async ({ browser }) => {
     { label: "VLAN", type: "vlan" },
     { label: "Host", type: "hostname" },
     { label: "DNS Servers", type: "ip_list" },
+    { label: "VPN", type: "port" },
+    { label: "RTP", type: "port_range" },
   ]);
 
   // A MAC field with a format of its own, chosen as it is created.
@@ -197,4 +199,43 @@ test("keeps DNS servers in order, filled from one paste", async ({ page }) => {
   // Editing again starts from what was saved, in order.
   await page.goto(editUrl);
   await expect(page.getByRole("textbox", { name: "DNS Servers 2 address" })).toHaveValue("1.1.1.1");
+});
+
+test("saves a port and a port range with their protocols", async ({ page }) => {
+  await page.goto(editUrl);
+
+  // A paste fills the number and the protocol, and the service is named.
+  const vpn = page.getByRole("textbox", { name: "VPN port" });
+  await vpn.focus();
+  await vpn.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "UDP 51820");
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(vpn).toHaveValue("51820");
+  await expect(page.getByRole("combobox", { name: "VPN protocol" })).toHaveValue("udp");
+  await expect(page.getByText("Usually WireGuard.")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "RTP, first port" }).fill("10000");
+  await page.getByRole("textbox", { name: "RTP, last port" }).fill("20000");
+  await page.getByRole("combobox", { name: "RTP protocol" }).selectOption("udp");
+  await expect(page.getByText("10,001 ports")).toBeVisible();
+
+  await page.getByRole("button", { name: "Save document" }).click();
+  await expect(page).toHaveURL(viewUrl);
+
+  const row = (label: string) =>
+    page.locator("dl > div").filter({ has: page.getByText(label, { exact: true }) });
+  await expect(row("VPN")).toContainText("51820");
+  await expect(row("VPN")).toContainText("UDP");
+  await expect(row("VPN")).toContainText("WireGuard");
+  await expect(row("RTP")).toContainText("10000–20000");
+  await expect(row("RTP")).toContainText("10,001 ports");
+});
+
+test("refuses a range in a single port field", async ({ page }) => {
+  await page.goto(editUrl);
+  await page.getByRole("textbox", { name: "VPN port" }).fill("500-4500");
+  await page.getByRole("button", { name: "Save document" }).click();
+  await expect(page.getByText("Use a Port range field for several")).toBeVisible();
 });

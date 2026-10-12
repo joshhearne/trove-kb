@@ -74,6 +74,8 @@ function resolve(
       );
     case "range":
       return `${rendered.start}-${rendered.end}`;
+    case "port":
+      return rendered.value;
     case "url":
       return rendered.href;
     case "html":

@@ -318,3 +318,29 @@ describe("IP address lists", () => {
     expect(text.split(" ")).toEqual(expect.arrayContaining(["8.8.8.8", "1.1.1.1"]));
   });
 });
+
+describe("ports", () => {
+  it("saves a port with its protocol, and takes a bare number from the API", () => {
+    expect(value("port", "TCP 443")).toEqual({ ok: true, value: "443/tcp" });
+    expect(value("port", 8443)).toEqual({ ok: true, value: "8443" });
+    expect(value("port", "rdp")).toEqual({ ok: true, value: "3389/tcp" });
+  });
+
+  it("refuses a range in a port field, and a bad port", () => {
+    const range = value("port", "5060-5080");
+    expect(range.ok === false && range.message).toContain("Port range field");
+    expect(value("port", "70000").ok).toBe(false);
+  });
+
+  it("saves a range, and a range of one as a single port", () => {
+    expect(value("port_range", "5060:5080 udp")).toEqual({ ok: true, value: "5060-5080/udp" });
+    expect(value("port_range", "10000-10000/udp")).toEqual({ ok: true, value: "10000/udp" });
+    expect(value("port_range", "5080-5060").ok).toBe(false);
+  });
+
+  it("indexes the number, the protocol, and the service", () => {
+    const port = field("port");
+    const text = flattenForSearch([port], { [port.id]: "443/tcp" });
+    expect(text.split(" ")).toEqual(expect.arrayContaining(["443", "tcp", "HTTPS"]));
+  });
+});
