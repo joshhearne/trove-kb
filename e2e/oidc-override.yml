@@ -8,6 +8,7 @@ services:
       # Must match the origin the browser uses, or the OAuth state cookie
       # set before the redirect is not sent back with the callback.
       APP_URL: ${APP_URL:-http://127.0.0.1:3090}
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://mock-oidc:8080/default}
+      # The spec always passes the issuer, on whatever E2E_OIDC_PORT says.
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://mock-oidc:18080/default}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-trove-kb-e2e}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-trove-kb-e2e-secret}

@@ -1,6 +1,18 @@
 import { expect, type Page } from "@playwright/test";
 import { psql } from "./db";
 
+/**
+ * What a spec that recreates the app container must hand compose. The base
+ * file takes APP_URL from the shell, and compose fills a missing one from
+ * .env, which on a host that also runs a deployment is its https address:
+ * the app would then set Secure cookies over plain http, and every spec after
+ * it that fetches with page.request would be signed out.
+ */
+export const STACK_ENV = {
+  APP_PORT: "3090",
+  APP_URL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3090",
+};
+
 export const ADMIN = {
   email: "e2e-admin@example.com",
   password: "Correct horse battery 7!",

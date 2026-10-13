@@ -10,7 +10,7 @@ import {
   VAULT_ITEM_NAME,
   VAULT_ITEM_PASSWORD,
 } from "./fake-vault";
-import { createCompany, createDocType, createDocument, signInAsAdmin, unique } from "./support";
+import { createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
 
 /**
  * Phase 6. The rules under test come from CLAUDE.md and
@@ -48,7 +48,7 @@ function compose(args: string[], env: Record<string, string> = {}): void {
 
 /** Restarts the app with a different VAULT_MODE and waits for health. */
 function setVaultMode(mode: "link" | "bw_serve"): void {
-  compose(["up", "-d", "--force-recreate", "app"], { VAULT_MODE: mode, APP_PORT: "3090" });
+  compose(["up", "-d", "--force-recreate", "app"], { VAULT_MODE: mode, ...STACK_ENV });
 
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {

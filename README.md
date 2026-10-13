@@ -399,6 +399,10 @@ docker compose -p trove-kb-test down -v
 The tests read the database directly. If your `.env` sets a database role
 other than the default, pass it along with `E2E_DB_USER`.
 
+The single sign-on test runs a mock identity provider published on host port
+18080. If something on the host already holds that port, choose another with
+`E2E_OIDC_PORT`.
+
 The footer of the signed-in pages names the release it is, `v1.2.3`, read
 from `package.json`. To cut a release, set that version first, then tag it
 the same, and the Release workflow publishes the notes:

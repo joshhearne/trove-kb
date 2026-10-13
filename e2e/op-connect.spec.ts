@@ -10,7 +10,7 @@ import {
   startFakeConnect,
   stopFakeConnect,
 } from "./fake-op-connect";
-import { createCompany, createDocType, createDocument, signInAsAdmin, unique } from "./support";
+import { createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
 
 /**
  * 1Password through a self-hosted Connect server. The same rules the Bitwarden
@@ -40,7 +40,7 @@ function setVaultMode(mode: string, extra: Record<string, string> = {}): void {
   const files = ["-f", "docker-compose.yml", "-f", "e2e/vault-override.yml"];
   execFileSync("docker", ["compose", "-p", PROJECT, ...files, "up", "-d", "--force-recreate", "app"], {
     cwd: REPO,
-    env: { ...process.env, VAULT_MODE: mode, APP_PORT: "3090", ...extra },
+    env: { ...process.env, VAULT_MODE: mode, ...STACK_ENV, ...extra },
     stdio: "ignore",
   });
 

@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
 import { psql } from "./db";
-import { ADMIN, openAccountMenu, signInAsAdmin } from "./support";
-import { CLIENT_ID, ISSUER, startMockOidc, stopMockOidc } from "./mock-oidc";
+import { ADMIN, openAccountMenu, signInAsAdmin, STACK_ENV } from "./support";
+import { CLIENT_ID, ISSUER, MOCK_OIDC_ORIGIN, startMockOidc, stopMockOidc } from "./mock-oidc";
 
 /**
  * Single sign-on, end to end against a real OIDC provider: discovery, the
@@ -30,8 +30,7 @@ function restartApp(withOidc: boolean): void {
 
   const env = {
     ...process.env,
-    APP_PORT: "3090",
-    APP_URL: "http://127.0.0.1:3090",
+    ...STACK_ENV,
     ...(withOidc
       ? {
           OIDC_ISSUER: ISSUER,
@@ -89,7 +88,9 @@ test.afterAll(() => {
 
 /** Fills the provider's login form with a subject and the claims Trove KB needs. */
 async function signInAtProvider(page: Page, email: string) {
-  await expect(page).toHaveURL(/mock-oidc:8080\/default\/authorize/);
+  await expect(page).toHaveURL((url) =>
+    url.href.startsWith(`${MOCK_OIDC_ORIGIN}/default/authorize`),
+  );
   await page.locator('input[name="username"]').fill(email);
   await page.locator('textarea[name="claims"]').fill(
     JSON.stringify({ email, email_verified: true, name: "SSO User" }),

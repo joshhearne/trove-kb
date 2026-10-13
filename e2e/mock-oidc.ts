@@ -7,9 +7,16 @@ import { execFileSync } from "node:child_process";
  * localhost by Playwright's host resolver rules).
  */
 const NAME = "mock-oidc";
-const PORT = 8080;
+/**
+ * One port for the browser (published on the host) and the app (on the
+ * compose network), since the issuer the app trusts is the one the browser
+ * is sent to. E2E_OIDC_PORT moves it off a port the host already uses; the
+ * server listens on the same number inside its container.
+ */
+const PORT = Number(process.env.E2E_OIDC_PORT ?? 18080);
 
-export const ISSUER = `http://${NAME}:${PORT}/default`;
+export const MOCK_OIDC_ORIGIN = `http://${NAME}:${PORT}`;
+export const ISSUER = `${MOCK_OIDC_ORIGIN}/default`;
 export const CLIENT_ID = "trove-kb-e2e";
 export const CLIENT_SECRET = "trove-kb-e2e-secret";
 
@@ -29,6 +36,7 @@ export function startMockOidc(network: string): void {
     "--network", network,
     // Published so the browser can reach the same host:port the app uses.
     "-p", `${PORT}:${PORT}`,
+    "-e", `SERVER_PORT=${PORT}`,
     "ghcr.io/navikt/mock-oauth2-server:2.1.10",
   ]);
 

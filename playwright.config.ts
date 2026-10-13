@@ -27,8 +27,9 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
-          // The OIDC test's provider is reachable as mock-oidc:8080 from the
-          // app container; map that name to the published port for the browser.
+          // The OIDC test's provider is reachable as mock-oidc:<E2E_OIDC_PORT>
+          // from the app container; map that name to the published port for
+          // the browser.
           args: ["--host-resolver-rules=MAP mock-oidc 127.0.0.1"],
         },
       },
