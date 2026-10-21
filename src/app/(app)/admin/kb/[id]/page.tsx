@@ -72,7 +72,7 @@ export default async function KbCollectionAdminPage({
   const endpoint = `${env.APP_URL.replace(/\/+$/, "")}/api/mcp`;
   // One line: a command broken across two loses its second half to whatever
   // pastes it, and what is left connects with no key at all.
-  const connect = `claude mcp add --transport http trove-kb ${endpoint} --header "Authorization: YOUR_API_KEY"`;
+  const connect = `claude mcp add --transport http trove-kb ${endpoint} --header "X-Auth-Token: YOUR_API_KEY"`;
   const instruct = [
     "## Knowledge base",
     `This application's user documentation lives in Trove KB, in the collection "${collection.name}"`,

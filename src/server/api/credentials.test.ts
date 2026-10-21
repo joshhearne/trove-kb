@@ -34,6 +34,21 @@ describe("presentedKey", () => {
     expect(from({ Authorization: "Basic dXNlcjpwYXNz", "X-API-Key": "trove_abc123" })).toBe("");
   });
 
+  it("reads X-Auth-Token, bare or behind Bearer", () => {
+    expect(from({ "X-Auth-Token": "trove_abc123" })).toBe("trove_abc123");
+    expect(from({ "x-auth-token": " Bearer trove_abc123 " })).toBe("trove_abc123");
+  });
+
+  it("prefers X-Auth-Token to Authorization and X-API-Key", () => {
+    expect(
+      from({ "X-Auth-Token": "trove_one", Authorization: "Bearer host_token", "X-API-Key": "trove_three" }),
+    ).toBe("trove_one");
+  });
+
+  it("takes no key from X-Auth-Token in another scheme, and does not fall back", () => {
+    expect(from({ "X-Auth-Token": "Basic dXNlcjpwYXNz", Authorization: "trove_abc123" })).toBe("");
+  });
+
   it("finds nothing where there is nothing", () => {
     expect(from({})).toBe("");
     expect(from({ Authorization: "   " })).toBe("");

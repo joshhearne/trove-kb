@@ -104,11 +104,11 @@ export function buildOpenApiDocument(baseUrl: string) {
       title: "Trove KB API",
       version: "1.0.0",
       description:
-        "Self-hosted structured IT documentation. Authenticate with an API key as a bearer token.",
+        "Self-hosted structured IT documentation. Authenticate with an API key in the X-Auth-Token header, or as a bearer token.",
       license: { name: "AGPL-3.0-or-later", identifier: "AGPL-3.0-or-later" },
     },
     servers: [{ url: `${baseUrl}/api/v1` }],
-    security: [{ apiKey: [] }],
+    security: [{ authToken: [] }, { apiKey: [] }],
     tags: [
       { name: "Companies" },
       { name: "Locations" },
@@ -474,6 +474,12 @@ export function buildOpenApiDocument(baseUrl: string) {
     },
     components: {
       securitySchemes: {
+        authToken: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Auth-Token",
+          description: `The API key, bare or after "Bearer ". Scopes: ${API_SCOPES.join(", ")}. admin implies write, write implies read.`,
+        },
         apiKey: {
           type: "http",
           scheme: "bearer",

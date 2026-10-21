@@ -1,7 +1,9 @@
 # API v1
 
-Base: `/api/v1`. JSON. Auth: `Authorization: Bearer <api_key>`. The key is also
-accepted on its own, as `Authorization: <api_key>` or `X-API-Key: <api_key>`.
+Base: `/api/v1`. JSON. Auth: `X-Auth-Token: <api_key>`, the same header for the REST
+API and MCP (`/api/mcp`); it is one an organization's custom MCP connector can set.
+`Authorization: Bearer <api_key>`, `Authorization: <api_key>` and `X-API-Key: <api_key>`
+are also accepted. When several are sent, `X-Auth-Token` wins, then `Authorization`.
 Spec generated from Zod schemas and served at `/api/v1/openapi.json`.
 Cursor pagination: `?limit=50&cursor=...`, response has `next_cursor`.
 

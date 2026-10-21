@@ -89,6 +89,8 @@ test("the key is accepted as it was handed out, with or without a scheme", async
     { Authorization: apiKey },
     { Authorization: `bearer   ${apiKey}` },
     { "X-API-Key": apiKey },
+    { "x-auth-token": apiKey },
+    { "X-Auth-Token": `Bearer ${apiKey}` },
   ];
   for (const headers of accepted) {
     const response = await request.post("/api/mcp", { headers, data: ping });
@@ -98,6 +100,8 @@ test("the key is accepted as it was handed out, with or without a scheme", async
   // The REST API reads a key the same way.
   const rest = await request.get("/api/v1/companies", { headers: { Authorization: apiKey } });
   expect(rest.status()).toBe(200);
+  const restToken = await request.get("/api/v1/companies", { headers: { "x-auth-token": apiKey } });
+  expect(restToken.status()).toBe(200);
 });
 
 test("a key that is wrong, or in a scheme that is not ours, is refused", async ({ request }) => {
@@ -107,6 +111,7 @@ test("a key that is wrong, or in a scheme that is not ours, is refused", async (
     { Authorization: `${apiKey}x` },
     { Authorization: `Basic ${Buffer.from(`user:${apiKey}`).toString("base64")}` },
     { "X-API-Key": "trove_not-a-real-key-at-all" },
+    { "x-auth-token": `${apiKey}x` },
   ];
   for (const headers of refused) {
     const response = await request.post("/api/mcp", { headers, data: ping });

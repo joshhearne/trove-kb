@@ -44,13 +44,14 @@ Better Auth rejects requests whose origin does not match it.
 
 ## API
 
-`/api/v1`, authenticated with an API key as a bearer token (Admin → API keys).
+`/api/v1`, authenticated with an API key (Admin → API keys) in the `X-Auth-Token`
+header. `Authorization: Bearer <key>` and `X-API-Key` are accepted too.
 The spec is generated from the same Zod schemas the endpoints validate with and
 served at `/api/v1/openapi.json`.
 
 ```bash
-curl -H "Authorization: Bearer $TROVE_KEY" http://localhost:3080/api/v1/companies
-curl -H "Authorization: Bearer $TROVE_KEY" \
+curl -H "X-Auth-Token: $TROVE_KEY" http://localhost:3080/api/v1/companies
+curl -H "X-Auth-Token: $TROVE_KEY" \
   "http://localhost:3080/api/v1/lookup?system=halopsa&entity=company&external_id=123"
 ```
 
@@ -91,7 +92,7 @@ keys as the REST API, so access is granted and revoked in one place.
 
 ```bash
 claude mcp add --transport http trove-kb https://trove-kb.example.com/api/mcp \
-  --header "Authorization: Bearer $TROVE_KEY"
+  --header "X-Auth-Token: $TROVE_KEY"
 ```
 
 Documentation tools are read-only: `search_documents`, `get_document`,
