@@ -892,3 +892,50 @@ ALTER TABLE fields ADD CONSTRAINT fields_field_type_check CHECK (field_type IN (
   'text','markdown','richtext','number','date','url','ip','ip_list','network','ip_range','mac',
   'vlan','hostname','port','port_range','port_list','asn','boolean','dropdown','multi_dropdown',
   'doc_link','secret_ref'));
+
+-- ---------- Updates ----------
+-- The administrator's update policy, read by the host updater
+-- (updater/trove-kb-update.sh). The app only stores the choice and the reports.
+CREATE TABLE update_settings (
+  id                  boolean PRIMARY KEY DEFAULT true CONSTRAINT update_settings_singleton CHECK (id),
+  channel             text NOT NULL DEFAULT 'manual'
+                      CHECK (channel IN ('production','development','manual')),
+  update_hour         integer NOT NULL DEFAULT 3 CHECK (update_hour BETWEEN 0 AND 23),
+  update_requested_at timestamptz,
+  update_requested_by uuid REFERENCES users(id),
+  host_last_seen_at   timestamptz,
+  last_report         jsonb,
+  pending_changes     jsonb,
+  updated_at          timestamptz NOT NULL DEFAULT now(),
+  updated_by          uuid REFERENCES users(id)
+);
+
+-- Updates, rollbacks and failures the host reported: the patching history.
+CREATE TABLE update_events (
+  id           bigserial PRIMARY KEY,
+  at           timestamptz NOT NULL DEFAULT now(),
+  status       text NOT NULL CHECK (status IN ('updated','rolled_back','failed')),
+  channel      text,
+  from_version text,
+  to_version   text,
+  message      text
+);
+CREATE INDEX update_events_at_idx ON update_events (at);
+
+-- What's new: the change files (changes/*.md) a build brought in for the first
+-- time are a release; each file is one entry.
+CREATE TABLE change_releases (
+  id          serial PRIMARY KEY,
+  version     text,
+  commit      text,
+  deployed_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE change_entries (
+  id         text PRIMARY KEY,
+  release_id integer NOT NULL REFERENCES change_releases(id) ON DELETE CASCADE,
+  kind       text NOT NULL CHECK (kind IN ('feature','improvement','fix')),
+  audience   text NOT NULL CHECK (audience IN ('everyone','admins')),
+  items      jsonb NOT NULL
+);
+CREATE INDEX change_entries_release_idx ON change_entries (release_id);
+ALTER TABLE users ADD COLUMN whats_new_seen_release_id integer;

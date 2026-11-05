@@ -1,0 +1,84 @@
+name: Images
+
+# Builds the app image that Docker installs run, and publishes it to GHCR.
+# The host updater (updater/trove-kb-update.sh) pins each install to one of
+# these exact tags:
+#
+#   push to dev       -> trove-kb:dev-<sha7>  (+ floating :dev)
+#   tag vX.Y.Z        -> trove-kb:vX.Y.Z      (+ floating :stable)
+#   tag vX.Y.Z-rc.N   -> trove-kb:vX.Y.Z-rc.N (pre-release, no :stable)
+#
+# Each run goes through a GitHub Environment (development / production), so
+# that environment's protection rules gate who can publish to it.
+
+on:
+  push:
+    branches: [dev]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish trove-kb
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_type == 'tag' && 'production' || 'development' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Work out tags
+        id: meta
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/trove-kb"
+          SHORT="${GITHUB_SHA::7}"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="$GITHUB_REF_NAME"
+            TAGS="$IMAGE:$VERSION"
+            # Only full releases move :stable; release candidates don't.
+            case "$VERSION" in *-*) ;; *) TAGS="$TAGS,$IMAGE:stable" ;; esac
+          else
+            VERSION="dev-$SHORT"
+            TAGS="$IMAGE:$VERSION,$IMAGE:dev"
+          fi
+          {
+            echo "version=$VERSION"
+            echo "tags=$TAGS"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            TROVE_BUILD_VERSION=${{ steps.meta.outputs.version }}
+            TROVE_BUILD_COMMIT=${{ github.sha }}
+            TROVE_BUILT_AT=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

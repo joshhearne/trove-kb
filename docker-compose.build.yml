@@ -1,0 +1,22 @@
+# Build the app from this checkout instead of pulling the published image:
+#
+#   ./scripts/build-with-version.sh        # build, stamped with the git version
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+#
+# or, unstamped, in one step:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Put COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml in .env to make
+# that the default. The image is tagged trove-kb:local, so it never collides
+# with (or gets replaced by) a published one. The host updater manages the
+# published images only.
+services:
+  app:
+    image: trove-kb:local
+    build:
+      context: .
+      args:
+        TROVE_BUILD_VERSION: ${TROVE_BUILD_VERSION:-}
+        TROVE_BUILD_COMMIT: ${TROVE_BUILD_COMMIT:-}
+        TROVE_BUILT_AT: ${TROVE_BUILT_AT:-}

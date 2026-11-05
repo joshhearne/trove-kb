@@ -19,8 +19,9 @@ export const VENDOR_LOGO_LIGHT = "/vendor/hearne-technologies-light.png";
 export const VENDOR_LOGO_DARK = "/vendor/hearne-technologies-dark.png";
 export const LICENSE = "AGPL-3.0";
 /**
- * The release this build is, as people say it: the version in package.json,
- * which a release tag (v1.2.3) is cut to match. Not a commit hash.
+ * package.json's version, for a build nobody stamped. A published build says
+ * which release or dev build it is through TROVE_BUILD_VERSION, taken from
+ * the release tag (src/server/updates/build-info.ts); the tag is the version.
  */
 export const APP_VERSION: string = pkg.version;
 export const SOURCE_URL = "https://github.com/joshhearne/trove-kb";

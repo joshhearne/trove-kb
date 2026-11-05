@@ -42,6 +42,74 @@ Set `SEED_ON_START=true` to load the starter doc types (see `scripts/seed.ts`).
 Change the published port with `APP_PORT` in `.env`, and keep `APP_URL` in step —
 Better Auth rejects requests whose origin does not match it.
 
+`docker compose up` runs the published image, `ghcr.io/joshhearne/trove-kb:stable`
+(the newest release). Until the first release is published, or to run your own
+changes, build from the checkout instead:
+`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
+
+## Updates
+
+Trove KB can keep itself up to date. Under **Admin → System health**, an
+administrator picks a channel:
+
+- **Production**: installs each new release (a `vX.Y.Z` tag on `main`) at the
+  update hour.
+- **Development**: installs the newest build of the `dev` branch each night.
+  For test and staging servers.
+- **Manual** (the default): never updates on its own.
+
+The same page shows the build that is running, what is available, what the
+host said on its last check, an **Update now** button, the changes the next
+update brings (only administrators see this preview), and the recent updates,
+rollbacks and failures. Each of those, and every change of channel, is in the
+audit log too.
+
+After an update, everyone gets a **What's new** window once, listing what
+changed: new features in blue, improvements in green, fixes in orange.
+Administrators see every entry; everyone else sees only the ones written for
+them, and nothing when there are none. The entries come from `changes/` (see
+`changes/README.md`).
+
+The app never updates itself. A small **host updater** (`updater/`), run by a
+systemd timer every 10 minutes, reads the administrator's choice from the app,
+does the update, and reports back. Before each update it dumps the database
+into `backups/`; after it, it waits for the new build to answer, and rolls
+back to the previous one if it doesn't. It never moves to an older build.
+
+**Docker** (the updater runs as an ordinary user in the `docker` group, never
+root):
+
+```bash
+sudo updater/install-updater.sh            # as the checkout's owner, or --user <name>
+```
+
+It checks that the image for `TROVE_IMAGE_TAG` can be pulled before changing
+anything, adds `TROVE_UPDATER_TOKEN` to `.env`, starts the stack, and enables
+the timer. Extra compose files (NFS, say) go in `.env` as
+`COMPOSE_FILE=docker-compose.yml:docker-compose.nfs.yml`, which the updater's
+`docker compose` reads too.
+
+**Bare metal** (no Docker: Node 22, npm, git, PostgreSQL, and `pg_dump` for the
+backups):
+
+```bash
+git clone https://github.com/joshhearne/trove-kb.git /opt/trove-kb   # owned by the app's user
+cp /opt/trove-kb/.env.example /opt/trove-kb/.env
+# DATABASE_URL at your Postgres (not db:5432), AUTH_SECRET, APP_URL, APP_PORT,
+# and STORAGE_PATH somewhere that user can write
+sudo /opt/trove-kb/updater/install-updater.sh --mode bare-metal --user trove
+```
+
+That installs `trove-kb.service`, which runs the app as that user from
+`releases/<version>` through the `current` link, builds the first release
+from the checkout, and enables the timer. Each update is built beside the
+running release and switched in one step, so a failed build changes nothing
+and a rollback is instant. The one privileged thing the updater does is
+`systemctl restart trove-kb.service`, allowed by a single sudoers line.
+
+On a Manual server, `updater/trove-kb-update.sh --install v0.2.0` updates by
+hand, with the same backup and rollback. Logs: `journalctl -u trove-kb-update`.
+
 ## API
 
 `/api/v1`, authenticated with an API key (Admin → API keys) in the `X-Auth-Token`
@@ -391,10 +459,11 @@ End-to-end tests drive the inline editing flows in a real browser against a
 running instance:
 
 ```bash
-APP_PORT=3090 docker compose -p trove-kb-test up -d     # a throwaway stack
+APP_PORT=3090 docker compose -p trove-kb-test \
+  -f docker-compose.yml -f docker-compose.build.yml up -d --build   # a throwaway stack
 npx playwright install chromium                       # first time only
 E2E_BASE_URL=http://127.0.0.1:3090 npm run test:e2e
-docker compose -p trove-kb-test down -v
+docker compose -p trove-kb-test -f docker-compose.yml -f docker-compose.build.yml down -v
 ```
 
 The tests read the database directly. If your `.env` sets a database role
@@ -404,18 +473,51 @@ The single sign-on test runs a mock identity provider published on host port
 18080. If something on the host already holds that port, choose another with
 `E2E_OIDC_PORT`.
 
-The footer of the signed-in pages names the release it is, `v1.2.3`, read
-from `package.json`. To cut a release, set that version first, then tag it
-the same, and the Release workflow publishes the notes:
+### Branches and releases
+
+- **`dev`** is where work lands: pull requests go into `dev`. Every push to it
+  publishes `ghcr.io/joshhearne/trove-kb:dev-<sha7>` (and `:dev`), which
+  Development-channel servers install that night.
+- **`main`** is the newest release. A release is a `vX.Y.Z` tag on a tested
+  `dev` commit; the tag publishes `:vX.Y.Z` and moves `:stable`, which
+  Production-channel servers install at their update hour, and `main` moves
+  up to it. A tag with a suffix (`v0.3.0-rc.1`) publishes a pre-release and
+  leaves `:stable` and `main` alone.
+
+A user-visible change adds a file to `changes/` in the same pull request; it
+becomes that change's line in the What's new window (`changes/README.md`).
+
+The footer and Admin → System health name the build that is running:
+`dev-<sha7>` on a Development server, the release tag, `v1.2.3`, on a
+Production one. The tag is the version; nothing in the repository is bumped
+first.
+
+**Cutting a release** is a tag on `dev`, once `dev` has been tested and approved:
 
 ```bash
-npm version 0.2.0 --no-git-tag-version   # package.json and the lockfile
-git commit -sam "Release 0.2.0"
-git tag v0.2.0 && git push && git push --tags
+git fetch origin && git tag v0.2.0 origin/dev && git push origin v0.2.0
 ```
 
-The workflow refuses a tag that does not match `package.json`, so the
-version people see is always the one that was released.
+The tag publishes `:v0.2.0` and moves `:stable` (Images workflow), writes the
+release notes, and moves `main` up to the tagged commit (Release workflow), so
+`main` is always exactly the newest release. Because the release is a commit
+on `dev`, `dev` already contains it and nothing has to be merged back.
+
+`main` only ever fast-forwards to a tag. Its ruleset asks for a pull request,
+so the Release workflow pushes with a deploy key the ruleset lets bypass:
+create a key pair, add the public half under Settings → Deploy keys with write
+access, store the private half as the `RELEASE_DEPLOY_KEY` Actions secret, and
+add **Deploy keys** to the `main` ruleset's bypass list. Without the key the
+release still ships, and the workflow summary gives the one command that
+moves `main` by hand.
+
+One-time GitHub settings: create the **development** and **production**
+environments (Settings → Environments). Give **production** a deployment rule
+for tags matching `v*`, and required reviewers if a release should need an
+approval; a tag ruleset on `v*` limits who can cut one, since a tag is what
+reaches Production servers. The first image publish creates the `trove-kb` package on GHCR as
+private: make it public (Package settings → Change visibility) so servers can
+pull it without logging in.
 
 `db/schema.sql` is the reference data model, `src/server/db/schema.ts` mirrors it,
 and the SQL in `drizzle/` is what actually runs. Change all three together:

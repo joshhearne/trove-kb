@@ -24,3 +24,9 @@ playwright-report/
 docker-compose.override.yml
 deploy/
 backups/
+# host updater state (updater/)
+/releases/
+/current
+/.current.new
+/.build/
+.trove-update.*

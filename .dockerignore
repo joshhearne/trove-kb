@@ -11,3 +11,9 @@ secrets
 *.log
 Dockerfile
 .dockerignore
+# Host updater state: bare-metal releases and their builds, database dumps.
+releases
+current
+.build
+backups
+.trove-update.*

@@ -19,10 +19,19 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# Which build this is, for Admin -> System health and the host updater's
+# health check. .github/workflows/images.yml stamps them; a local build gets
+# them from scripts/build-with-version.sh, or goes without.
+ARG TROVE_BUILD_VERSION=
+ARG TROVE_BUILD_COMMIT=
+ARG TROVE_BUILT_AT=
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    TROVE_BUILD_VERSION=${TROVE_BUILD_VERSION} \
+    TROVE_BUILD_COMMIT=${TROVE_BUILD_COMMIT} \
+    TROVE_BUILT_AT=${TROVE_BUILT_AT}
 RUN addgroup -S -g 1001 nodejs \
  && adduser -S -u 1001 -G nodejs trove \
  && mkdir -p /data/uploads \
@@ -33,6 +42,8 @@ COPY --from=builder --chown=trove:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=trove:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=trove:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=trove:nodejs /app/dist ./dist
+# The What's new entries this build brings (src/server/services/whats-new.ts).
+COPY --from=builder --chown=trove:nodejs /app/changes ./changes
 COPY --chown=trove:nodejs docker/entrypoint.sh /app/entrypoint.sh
 
 USER trove

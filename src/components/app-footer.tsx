@@ -1,5 +1,4 @@
 import {
-  APP_VERSION,
   LICENSE,
   PRODUCT_NAME,
   SOURCE_URL,
@@ -11,6 +10,7 @@ import {
 import { getMessages } from "@/i18n/server";
 import { getInstanceBranding } from "@/server/services/branding";
 import { BrandLogo } from "@/components/brand";
+import { getBuildInfo } from "@/server/updates/build-info";
 
 /**
  * Two things that are not the same.
@@ -87,7 +87,7 @@ export async function AppFooter({
         {site === "app" && (
           <>
             <span aria-hidden>·</span>
-            <span title={t.app.version}>{`v${APP_VERSION}`}</span>
+            <span title={t.app.version}>{getBuildInfo().version}</span>
           </>
         )}
       </p>

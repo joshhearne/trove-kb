@@ -27,6 +27,8 @@ No coupling to any specific PSA in core code.
 - Business logic lives in `src/server/services/*`, shared by server actions and API routes. No logic in route files.
 - Drizzle schema in `src/server/db/schema.ts`, mirroring `db/schema.sql`. Migrations via drizzle-kit.
 - Tests: Vitest for services, Playwright for the inline-editing flows.
+- Branches: work and pull requests go into `dev`; `main` is released code only. A user-visible
+  change adds a file to `changes/` (see `changes/README.md`), written for the people using it.
 - Commits signed off (`git commit -s`). Commit messages are en-US only, like everything else
   here: "color", not "colour"; "license", not "licence".
 - en-US is the source language: code, comments, docs, identifiers, and the base catalog in `src/i18n/en-US.ts`. Never hardcode interface copy in a component — add a key and read it through `getMessages()` (server) or `useMessages()` (client).
@@ -135,6 +137,13 @@ UI. See docs/ARCHITECTURE.md.
 Roles are rows with a permission set (`roles`, `src/server/auth/permissions.ts`); the built-in
 three are fixed, custom ones any subset, chosen under Admin → Roles. Every check names its
 permission. "Administrator" means the role holds the admin area. See docs/ARCHITECTURE.md.
+
+### Phase 17: Updates
+Production / development / manual channels chosen under Admin → System health, carried out by
+the host updater in `updater/` (systemd timer, never root; Docker or bare metal), with backup,
+health check and rollback. A What's new pop-up per release from `changes/*.md`, filtered by
+audience. Pull requests go into `dev`; a release is a tag on `dev`, and `main` fast-forwards to it. See
+docs/ARCHITECTURE.md.
 
 ### Later
 Tags, multi-tenant, importers (Hudu, IT Glue CSV).

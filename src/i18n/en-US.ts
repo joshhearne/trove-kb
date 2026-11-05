@@ -56,6 +56,7 @@ export const enUS = {
     knowledgeBase: "Knowledge base",
     allCollections: "All collections",
     portal: "Portal",
+    system: "System health",
   },
 
   common: {
@@ -857,6 +858,75 @@ export const enUS = {
 
   admin: {
     subtitle: "Everything that is set once for the whole instance.",
+    system: {
+      title: "System health",
+      subtitle:
+        "Which build is running, how it updates, and what is coming next. Refreshes every 30 seconds.",
+      generated: (when: string) => `Generated ${when}`,
+      refresh: "Refresh",
+      refreshing: "Refreshing…",
+      buildInfo: "Build info",
+      version: "Version",
+      commit: "Commit",
+      built: "Built",
+      unknown: "unknown",
+      updates: "Updates",
+      channel: "Channel",
+      channels: {
+        production: "Production",
+        development: "Development",
+        manual: "Manual",
+      },
+      channelHints: {
+        production: "Installs each new release (main) at the update hour.",
+        development:
+          "Installs the latest dev build each night. For test and staging servers.",
+        manual: "Never updates on its own. Run the update commands on the server.",
+      },
+      updateHour: "Update hour",
+      updateHourZone: (zone: string) => `Update hour (${zone})`,
+      updateHourHint: "Server time. A short restart happens during the update.",
+      updateNow: "Update now",
+      updateRequested: "Update requested…",
+      updateNowSent: "Update requested. The server picks it up within 10 minutes.",
+      saved: "Update settings saved",
+      running: "Running",
+      latestAvailable: "Latest available",
+      lastCheck: "Last check",
+      hostMode: (mode: string) => `Host: ${mode}`,
+      notInstalled:
+        "The host updater isn't installed, so this server only updates by hand. On the server, run this from the Trove KB folder:",
+      neverSeen:
+        "The host updater hasn't checked in yet. Once installed it runs every 10 minutes; check it with:",
+      stale: (when: string) =>
+        `The host updater last checked in ${when}. Check it on the server with:`,
+      byHand: "Update by hand",
+      comingIn: (version: string) => `Coming in ${version}`,
+      nextUpdate: "the next update",
+      changeCount: (count: number) => `${count} ${count === 1 ? "change" : "changes"}`,
+      andMore: (count: number) => `…and ${count} more.`,
+      previewNote:
+        "Only administrators see this preview. Everyone sees the changes that concern them after the update installs.",
+      recentUpdates: "Recent updates",
+      noUpdates: "No updates recorded yet.",
+      events: {
+        updated: "Updated",
+        rolled_back: "Rolled back",
+        failed: "Failed",
+      },
+      releases: "What's new history",
+      releasesHint: "What each update brought, as people saw it in the pop-up.",
+      noReleases: "No releases recorded yet.",
+      counts: {
+        companies: "Companies",
+        documents: "Documents",
+        kbArticles: "KB articles",
+        users: "Users",
+        webhooksWaiting: "Webhook retries",
+        database: "Database size",
+        upSince: (when: string) => `up since ${when}`,
+      },
+    },
     notifications: {
       title: "Notifications",
       subtitle:
@@ -1576,6 +1646,20 @@ export const enUS = {
       apiKey: "API key",
       older: "Older entries",
     },
+  },
+
+  whatsNew: {
+    title: "What's new",
+    titleVersion: (version: string) => `What's new: ${version}`,
+    updated: (date: string) => `Updated ${date}`,
+    several: (count: number) => `${count} updates since you last looked`,
+    gotIt: "Got it",
+    kinds: {
+      feature: "New feature",
+      improvement: "Improvement",
+      fix: "Bug fix",
+    },
+    empty: "No changes listed.",
   },
 
   units: {
