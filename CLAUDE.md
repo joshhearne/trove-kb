@@ -142,7 +142,7 @@ permission. "Administrator" means the role holds the admin area. See docs/ARCHIT
 Production / development / manual channels chosen under Admin → System health, carried out by
 the host updater in `updater/` (systemd timer, never root; Docker or bare metal), with backup,
 health check and rollback. A What's new pop-up per release from `changes/*.md`, filtered by
-audience. Pull requests go into `dev`; releases are `dev` merged into `main` and tagged. See
+audience. Pull requests go into `dev`; a release is a tag on `dev`, and `main` fast-forwards to it. See
 docs/ARCHITECTURE.md.
 
 ### Later

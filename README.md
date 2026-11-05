@@ -478,37 +478,38 @@ The single sign-on test runs a mock identity provider published on host port
 - **`dev`** is where work lands: pull requests go into `dev`. Every push to it
   publishes `ghcr.io/joshhearne/trove-kb:dev-<sha7>` (and `:dev`), which
   Development-channel servers install that night.
-- **`main`** is what has been released. A release is a merge of `dev` into
-  `main`, tagged `vX.Y.Z`; the tag publishes `:vX.Y.Z` and moves `:stable`,
-  which Production-channel servers install at their update hour. A tag with a
-  suffix (`v0.3.0-rc.1`) publishes a pre-release and leaves `:stable` alone.
+- **`main`** is the newest release. A release is a `vX.Y.Z` tag on a tested
+  `dev` commit; the tag publishes `:vX.Y.Z` and moves `:stable`, which
+  Production-channel servers install at their update hour, and `main` moves
+  up to it. A tag with a suffix (`v0.3.0-rc.1`) publishes a pre-release and
+  leaves `:stable` and `main` alone.
 
 A user-visible change adds a file to `changes/` in the same pull request; it
 becomes that change's line in the What's new window (`changes/README.md`).
 
-The footer names the build that is running: the release, `v1.2.3`, or
-`dev-<sha7>` for a dev build. Both branches take changes only through pull
-requests with green checks (the repository's rulesets), so a release is three
-small steps:
+The footer and Admin → System health name the build that is running:
+`dev-<sha7>` on a Development server, the release tag, `v1.2.3`, on a
+Production one. The tag is the version; nothing in the repository is bumped
+first.
 
-1. **Set the version on `dev`.** A pull request into `dev` that runs
-   `npm version 0.2.0 --no-git-tag-version` (package.json and the lockfile)
-   and adds nothing else.
-2. **Release `dev` into `main`.** A pull request from `dev` into `main`,
-   titled "Release 0.2.0", merged with a merge commit (the only method `main`
-   allows). Then tag that merge commit:
+**Cutting a release** is a tag on `dev`, once `dev` has been tested and approved:
 
-   ```bash
-   git fetch origin && git tag v0.2.0 origin/main && git push origin v0.2.0
-   ```
+```bash
+git fetch origin && git tag v0.2.0 origin/dev && git push origin v0.2.0
+```
 
-   The tag runs the Release workflow (notes, and a refusal if the tag doesn't
-   match `package.json`) and the Images workflow (`:v0.2.0` and `:stable`).
-3. **Bring `main` back into `dev`.** A pull request from `main` into `dev`,
-   merged with a merge commit, so `dev` contains the release's merge commit.
-   Without it, a server moving from Production to Development would see the
-   dev build as older than its release and wait (the updater never installs
-   a build that isn't a descendant of the running one).
+The tag publishes `:v0.2.0` and moves `:stable` (Images workflow), writes the
+release notes, and moves `main` up to the tagged commit (Release workflow), so
+`main` is always exactly the newest release. Because the release is a commit
+on `dev`, `dev` already contains it and nothing has to be merged back.
+
+`main` only ever fast-forwards to a tag. Its ruleset asks for a pull request,
+so the Release workflow pushes with a deploy key the ruleset lets bypass:
+create a key pair, add the public half under Settings → Deploy keys with write
+access, store the private half as the `RELEASE_DEPLOY_KEY` Actions secret, and
+add **Deploy keys** to the `main` ruleset's bypass list. Without the key the
+release still ships, and the workflow summary gives the one command that
+moves `main` by hand.
 
 One-time GitHub settings: create the **development** and **production**
 environments (Settings → Environments). Give **production** a deployment rule

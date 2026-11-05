@@ -645,7 +645,9 @@ The app records an update policy and reports; it never runs an update.
   no token the endpoints answer 404. The policy also carries the running
   commit, which is the updater's health check after a deploy.
 - **Targets**: the newest `vX.Y.Z` tag (production) or the tip of `origin/dev`
-  (development). Only a descendant of the running commit is installed, since
+  (development). A release is a tag on a `dev` commit, and `main`
+  fast-forwards to it, so every release is an ancestor of the dev tip and a
+  server can move between channels in either direction. Only a descendant of the running commit is installed, since
   migrations only go forward. A failed build is skipped until a newer one or
   "Update now".
 - **Docker**: images are published by `.github/workflows/images.yml`
