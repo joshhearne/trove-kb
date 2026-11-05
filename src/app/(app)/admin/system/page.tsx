@@ -94,6 +94,7 @@ export default async function SystemHealthPage() {
                 status: status.lastReport.status,
                 message: status.lastReport.message,
                 availableVersion: status.lastReport.availableVersion,
+                channel: status.lastReport.channel,
                 hostTz: status.lastReport.hostTz,
                 mode: status.lastReport.mode,
               }

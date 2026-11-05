@@ -16,7 +16,9 @@
 #   1. Reads the administrator's policy (Admin -> System health):
 #      channel = production | development | manual, update hour, update now.
 #   2. Works out the target: the newest release tag (production) or the tip
-#      of origin/dev (development). Manual only reports what is available.
+#      of origin/dev, published as dev-<sha7> (development). Manual only
+#      reports what is available on the running build's own track: the tip of
+#      origin/dev for a dev build, the newest release otherwise.
 #   3. At the update hour, or when an administrator pressed "Update now", and
 #      when the target is newer: backs up the database, deploys the target,
 #      and waits for the app to report the new commit. If it doesn't, rolls
@@ -145,6 +147,16 @@ main() {
   else
     case "$CHANNEL" in
       manual)
+        # A dev build is on the dev track: the newest release is usually older
+        # than it, so offering that would offer a downgrade.
+        if [[ "$CURRENT_TAG" == dev-* ]]; then
+          local dev_commit
+          dev_commit="$(git rev-parse "refs/remotes/$REMOTE/dev")"
+          AVAILABLE="dev-${dev_commit:0:7}"
+          collect_pending "$dev_commit"
+          report manual "Manual updates: the newest dev build is $AVAILABLE."
+          return 0
+        fi
         AVAILABLE="$latest_release"
         if [ -n "$latest_release" ]; then
           collect_pending "$(git rev-parse "refs/tags/$latest_release^{commit}")"
@@ -179,6 +191,13 @@ main() {
     return 0
   fi
 
+  # Before the hour check, so an older build is never announced as coming.
+  if git cat-file -e "$CURRENT_COMMIT^{commit}" 2>/dev/null &&
+    ! git merge-base --is-ancestor "$CURRENT_COMMIT" "$target_commit"; then
+    report waiting "$target_tag is not newer than the running build ($CURRENT_TAG at ${CURRENT_COMMIT:0:7}), so it would be a downgrade. Waiting for a newer $CHANNEL build."
+    return 0
+  fi
+
   local hour
   hour="$(date +%H)"
   if [ "$UPDATE_NOW" != 1 ] && [ "$((10#$hour))" != "$UPDATE_HOUR" ]; then
@@ -193,12 +212,6 @@ main() {
   FAILED_FILE="$DIR/.trove-update.failed"
   if [ "$UPDATE_NOW" != 1 ] && [ "$(cat "$FAILED_FILE" 2>/dev/null)" = "$target_tag" ]; then
     report waiting "$target_tag failed to install earlier (see the update history); skipping it until a newer $CHANNEL build or Update now."
-    return 0
-  fi
-
-  if git cat-file -e "$CURRENT_COMMIT^{commit}" 2>/dev/null &&
-    ! git merge-base --is-ancestor "$CURRENT_COMMIT" "$target_commit"; then
-    report waiting "$target_tag is not newer than the running build ($CURRENT_TAG at ${CURRENT_COMMIT:0:7}), so it would be a downgrade. Waiting for a newer $CHANNEL build."
     return 0
   fi
 

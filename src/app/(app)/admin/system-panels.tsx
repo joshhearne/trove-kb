@@ -71,6 +71,8 @@ export type UpdatesPanelProps = {
     status: string;
     message: string | null;
     availableVersion: string | null;
+    /** The channel the host checked; null from a host that didn't say. */
+    channel: string | null;
     hostTz: string | null;
     mode: string | null;
   } | null;
@@ -108,6 +110,10 @@ export function UpdatesPanel(props: UpdatesPanelProps) {
   }
 
   const report = props.report;
+  // After a change of channel, the last report (and its preview) answers for
+  // the old one: a release where a dev build is now wanted, or the reverse.
+  const reportCurrent = !report?.channel || report.channel === channel;
+  const available = reportCurrent ? report?.availableVersion ?? null : null;
   const command = (text: string) => (
     <code className="mt-1 block rounded bg-[var(--muted)] px-2 py-1 font-mono text-xs">{text}</code>
   );
@@ -214,7 +220,11 @@ export function UpdatesPanel(props: UpdatesPanelProps) {
             <div>
               <div className={label}>{s.latestAvailable}</div>
               <div className="break-all font-mono">
-                {report?.availableVersion ?? <span className="text-[var(--muted-foreground)]">{s.unknown}</span>}
+                {available ?? (
+                  <span className={cn("text-[var(--muted-foreground)]", !reportCurrent && "font-sans text-xs")}>
+                    {reportCurrent ? s.unknown : s.awaitingCheck(s.channels[channel])}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -242,14 +252,14 @@ docker compose pull && docker compose up -d
         </div>
       </div>
 
-      {props.pending.total > 0 && (
+      {reportCurrent && props.pending.total > 0 && (
         <div className="border-t px-4 py-3">
           <details open={props.pending.total <= 10}>
             <summary className={cn(label, "cursor-pointer")}>
-              {report?.availableVersion ? (
+              {available ? (
                 <>
                   {s.comingIn("")}
-                  <span className="font-mono normal-case">{report.availableVersion}</span>
+                  <span className="font-mono normal-case">{available}</span>
                 </>
               ) : (
                 s.comingIn(s.nextUpdate)

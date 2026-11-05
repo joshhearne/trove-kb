@@ -878,9 +878,9 @@ export const enUS = {
         manual: "Manual",
       },
       channelHints: {
-        production: "Installs each new release (main) at the update hour.",
+        production: "Installs each new tagged release (v1.2.3) at the update hour.",
         development:
-          "Installs the latest dev build each night. For test and staging servers.",
+          "Installs the newest dev build (dev-<commit>) at the update hour. For test and staging servers.",
         manual: "Never updates on its own. Run the update commands on the server.",
       },
       updateHour: "Update hour",
@@ -892,6 +892,8 @@ export const enUS = {
       saved: "Update settings saved",
       running: "Running",
       latestAvailable: "Latest available",
+      awaitingCheck: (channel: string) =>
+        `The host checks the ${channel} channel on its next run, within 10 minutes.`,
       lastCheck: "Last check",
       hostMode: (mode: string) => `Host: ${mode}`,
       notInstalled:
