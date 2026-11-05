@@ -58,9 +58,9 @@ test("System health shows the build, the channel, and the history", async ({ pag
   await page.getByRole("radio", { name: /Development/ }).check();
   await expect(page.getByText("Update settings saved")).toBeVisible();
   await expect.poll(() => psql("select channel from update_settings;")).toBe("development");
-  await expect(page.getByLabel("Update hour")).toBeVisible();
+  await expect(page.getByLabel("Update hour", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Update hour").selectOption("4");
+  await page.getByLabel("Update hour", { exact: true }).selectOption("4");
   await expect.poll(() => psql("select update_hour from update_settings;")).toBe("4");
   await expect
     .poll(() => psql("select count(*) from audit_log where action = 'updates.policy_changed';"))
