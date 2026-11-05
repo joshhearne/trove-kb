@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   Bell,
   BookOpen,
   Globe,
@@ -55,6 +56,7 @@ export function AdminNav() {
     { href: "/admin/portal" as Route, label: t.nav.portal, icon: Globe },
     { href: "/admin/vault" as Route, label: t.nav.vault, icon: ShieldCheck },
     { href: "/admin/audit" as Route, label: t.nav.auditLog, icon: ScrollText },
+    { href: "/admin/system" as Route, label: t.nav.system, icon: Activity },
   ];
 
   const current = sections.find((section) => pathname.startsWith(section.href));

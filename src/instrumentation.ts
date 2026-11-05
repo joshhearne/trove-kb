@@ -21,6 +21,17 @@ export async function register(): Promise<void> {
   // to hold a timer.
   const { isWorkers } = await import("@/lib/runtime");
   if (isWorkers()) return;
+
+  // What's new: record the change files this build brings in, or drop the
+  // ones a rollback took away. Every replica may; the sync takes a lock.
+  // Never holds up startup.
+  const { syncChanges } = await import("@/server/services/whats-new");
+  void syncChanges()
+    .then(({ added, removed }) => {
+      if (added || removed) console.log(`trove-kb: what's new: ${added} new, ${removed} removed`);
+    })
+    .catch((error) => console.error("trove-kb: what's new sync failed", error));
+
   if (process.env.TROVE_DISABLE_WEBHOOK_WORKER === "true") return;
   if (globalThis.__troveWebhookWorker) return;
 

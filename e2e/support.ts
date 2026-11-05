@@ -13,6 +13,12 @@ export const STACK_ENV = {
   APP_URL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3090",
 };
 
+/**
+ * The compose files the test stack runs from: built from this checkout
+ * (docker-compose.build.yml), never the published image the base file names.
+ */
+export const COMPOSE_FILES = ["-f", "docker-compose.yml", "-f", "docker-compose.build.yml"];
+
 export const ADMIN = {
   email: "e2e-admin@example.com",
   password: "Correct horse battery 7!",
@@ -52,6 +58,18 @@ export async function signInAsAdmin(page: Page): Promise<void> {
   }
 
   await expect(page).toHaveURL(/\/companies/);
+  await dismissWhatsNew(page);
+}
+
+/**
+ * A database that outlived an update (a local run) may greet an old account
+ * with the What's new pop-up, which would sit over whatever a spec clicks.
+ */
+export async function dismissWhatsNew(page: Page): Promise<void> {
+  const dialog = page.getByRole("dialog", { name: /What's new/ });
+  if (await dialog.isVisible().catch(() => false)) {
+    await dialog.getByRole("button", { name: "Got it" }).click();
+  }
 }
 
 /** Signs in as somebody other than the admin. */
@@ -61,6 +79,7 @@ export async function signInAs(page: Page, email: string, password: string): Pro
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/companies/);
+  await dismissWhatsNew(page);
 }
 
 export async function createOptionList(page: Page, name: string, items: string[]): Promise<void> {

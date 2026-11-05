@@ -1,0 +1,18 @@
+# Template: updater/install-updater.sh fills in @DIR@ and @USER@ and installs
+# this as /etc/systemd/system/trove-kb-update.service.
+#
+# Runs as @USER@, never root. With Docker that user is in the docker group;
+# on bare metal it owns the checkout and may restart trove-kb.service through
+# one sudoers line (/etc/sudoers.d/trove-kb-update).
+[Unit]
+Description=Trove KB update check
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=@DIR@/updater/trove-kb-update.sh
+# A full update fits well inside this; a bare-metal build is the long part.
+TimeoutStartSec=60min

@@ -19,6 +19,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  serial,
   text,
   timestamp,
   unique,
@@ -88,6 +89,8 @@ export const users = pgTable(
     mfaLockedUntil: timestamp("mfa_locked_until", { withTimezone: true }),
     /** How a revealed secret is shown to them; see src/lib/secret-style.ts. */
     secretStyle: text("secret_style").notNull().default("on"),
+    /** The newest release whose What's new pop-up they have closed (change_releases.id). */
+    whatsNewSeenReleaseId: integer("whats_new_seen_release_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(now),
@@ -1434,5 +1437,111 @@ export const kbConnectors = pgTable(
       sql`${t.maxPages} BETWEEN 1 AND 20000`,
     ),
     index("kb_connectors_due_idx").on(t.nextRunAt),
+  ],
+);
+
+/* ---------- Updates ---------- */
+
+export const UPDATE_CHANNELS = ["production", "development", "manual"] as const;
+
+/**
+ * The administrator's update policy, read by the host updater
+ * (updater/trove-kb-update.sh) over /api/internal/updates/policy. The app never
+ * runs Docker, git or systemctl itself: it stores the choice and the reports
+ * the host sends back. Manual until an administrator opts in.
+ */
+export const updateSettings = pgTable(
+  "update_settings",
+  {
+    id: boolean("id").primaryKey().default(true),
+    channel: text("channel").notNull().default("manual"),
+    /** Server time, 0-23: when an available update installs. */
+    updateHour: integer("update_hour").notNull().default(3),
+    /** "Update now": the host installs on its next run instead of waiting. */
+    updateRequestedAt: timestamp("update_requested_at", { withTimezone: true }),
+    updateRequestedBy: uuid("update_requested_by").references(() => users.id),
+    hostLastSeenAt: timestamp("host_last_seen_at", { withTimezone: true }),
+    /** The host's last report, as src/server/updates/report.ts parses it. */
+    lastReport: jsonb("last_report").$type<Record<string, unknown>>(),
+    /** Change files in the build the host would install next. */
+    pendingChanges: jsonb("pending_changes").$type<Record<string, unknown>>(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(now),
+    updatedBy: uuid("updated_by").references(() => users.id),
+  },
+  (t) => [
+    check("update_settings_singleton", sql`${t.id}`),
+    check(
+      "update_settings_channel_check",
+      sql`${t.channel} IN ('production','development','manual')`,
+    ),
+    check(
+      "update_settings_hour_check",
+      sql`${t.updateHour} BETWEEN 0 AND 23`,
+    ),
+  ],
+);
+
+/**
+ * Updates, rollbacks and failures the host reported: the patching history.
+ * Routine "checked, nothing new" runs only refresh update_settings.last_report.
+ */
+export const updateEvents = pgTable(
+  "update_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().default(now),
+    status: text("status").notNull(),
+    channel: text("channel"),
+    fromVersion: text("from_version"),
+    toVersion: text("to_version"),
+    message: text("message"),
+  },
+  (t) => [
+    check(
+      "update_events_status_check",
+      sql`${t.status} IN ('updated','rolled_back','failed')`,
+    ),
+    index("update_events_at_idx").on(t.at),
+  ],
+);
+
+/**
+ * What's new. A release is the set of change files (changes/*.md) a build
+ * brought in for the first time; each entry is one change file, keyed by its
+ * file name. A rollback boots a build without the newest files, and those
+ * entries go again, so the pop-up never describes a build that is not running.
+ */
+export const changeReleases = pgTable("change_releases", {
+  id: serial("id").primaryKey(),
+  version: text("version"),
+  commit: text("commit"),
+  deployedAt: timestamp("deployed_at", { withTimezone: true })
+    .notNull()
+    .default(now),
+});
+
+export const changeEntries = pgTable(
+  "change_entries",
+  {
+    id: text("id").primaryKey(),
+    releaseId: integer("release_id")
+      .notNull()
+      .references(() => changeReleases.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    audience: text("audience").notNull(),
+    items: jsonb("items").$type<string[]>().notNull(),
+  },
+  (t) => [
+    check(
+      "change_entries_kind_check",
+      sql`${t.kind} IN ('feature','improvement','fix')`,
+    ),
+    check(
+      "change_entries_audience_check",
+      sql`${t.audience} IN ('everyone','admins')`,
+    ),
+    index("change_entries_release_idx").on(t.releaseId),
   ],
 );

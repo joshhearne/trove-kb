@@ -632,6 +632,36 @@ appears in the documentation search.
 - Imports and connectors need a filesystem and raw sockets, so on Workers they
   report that they are unavailable. Reading and search work anywhere.
 
+## Updates
+The app records an update policy and reports; it never runs an update.
+
+- **Policy** (`update_settings`, one row): channel `production` | `development`
+  | `manual` (default), update hour (server time), and an "update now" request.
+  Changed under Admin → System health by an administrator with a fresh second
+  step; each change is audited.
+- **Host updater** (`updater/trove-kb-update.sh`, a systemd timer every 10
+  minutes, never root): reads `GET /api/internal/updates/policy` and posts
+  `POST /api/internal/updates/report`, both with `TROVE_UPDATER_TOKEN`. With
+  no token the endpoints answer 404. The policy also carries the running
+  commit, which is the updater's health check after a deploy.
+- **Targets**: the newest `vX.Y.Z` tag (production) or the tip of `origin/dev`
+  (development). Only a descendant of the running commit is installed, since
+  migrations only go forward. A failed build is skipped until a newer one or
+  "Update now".
+- **Docker**: images are published by `.github/workflows/images.yml`
+  (`:dev-<sha7>`, `:vX.Y.Z`, `:stable`); the updater pins `TROVE_IMAGE_TAG`.
+  **Bare metal**: it builds `releases/<version>` in a git worktree, points
+  `current` at it, and restarts `trove-kb.service`.
+- **History** (`update_events`): updates, rollbacks and failures, newest 200;
+  the audit log keeps every one (`updates.*`).
+- **What's new** (`change_releases`, `change_entries`,
+  `users.whats_new_seen_release_id`): on boot the app compares `changes/*.md`
+  with what it has recorded. New files make a release; files a rollback took
+  away are removed, with any release left empty. A person sees each release
+  deployed after their account was made, once, filtered by audience
+  (`admins` entries need the admin area). The updater sends the change files
+  the next build adds, for the administrators' preview.
+
 ## Accounts and second factors
 Trove KB has accounts of its own, so it has a second step of its own: single
 sign-on in front of it, or Cloudflare Access, is not a substitute.

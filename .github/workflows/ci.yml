@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -117,7 +117,9 @@ jobs:
 
       - name: Start the stack
         run: |
-          ENV_FILE=.env APP_PORT=3090 docker compose -p trove-kb-test up -d --build
+          # Built from this checkout, not the published image.
+          ENV_FILE=.env APP_PORT=3090 docker compose -p trove-kb-test \
+            -f docker-compose.yml -f docker-compose.build.yml up -d --build
           for _ in $(seq 1 60); do
             status=$(docker inspect --format '{{.State.Health.Status}}' trove-kb-test-app-1 2>/dev/null || echo starting)
             [ "$status" = "healthy" ] && exit 0
@@ -154,5 +156,5 @@ jobs:
       - name: Tear down
         if: always()
         run: |
-          docker compose -p trove-kb-test down -v || true
+          docker compose -p trove-kb-test -f docker-compose.yml -f docker-compose.build.yml down -v || true
           docker rm -f mock-oidc bw-serve || true

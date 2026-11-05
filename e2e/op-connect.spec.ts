@@ -10,7 +10,7 @@ import {
   startFakeConnect,
   stopFakeConnect,
 } from "./fake-op-connect";
-import { createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
+import { COMPOSE_FILES, createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
 
 /**
  * 1Password through a self-hosted Connect server. The same rules the Bitwarden
@@ -37,7 +37,7 @@ test.describe.configure({ mode: "serial" });
 function setVaultMode(mode: string, extra: Record<string, string> = {}): void {
   // The overlay is what carries VAULT_MODE and the credentials in from the
   // shell; the base file deliberately leaves them to the env file.
-  const files = ["-f", "docker-compose.yml", "-f", "e2e/vault-override.yml"];
+  const files = [...COMPOSE_FILES, "-f", "e2e/vault-override.yml"];
   execFileSync("docker", ["compose", "-p", PROJECT, ...files, "up", "-d", "--force-recreate", "app"], {
     cwd: REPO,
     env: { ...process.env, VAULT_MODE: mode, ...STACK_ENV, ...extra },

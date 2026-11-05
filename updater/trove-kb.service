@@ -1,0 +1,24 @@
+# Template: updater/install-updater.sh --mode bare-metal fills in @DIR@ and
+# @USER@ and installs this as /etc/systemd/system/trove-kb.service.
+#
+# The app itself, on bare metal: the release that @DIR@/current points at,
+# with @DIR@/.env. The updater restarts it after switching releases.
+[Unit]
+Description=Trove KB
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=@DIR@/updater/trove-kb-start.sh
+Restart=on-failure
+RestartSec=5
+# Migrations run before the server listens.
+TimeoutStartSec=5min
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
 import { psql } from "./db";
-import { ADMIN, openAccountMenu, signInAsAdmin, STACK_ENV } from "./support";
+import { COMPOSE_FILES, ADMIN, openAccountMenu, signInAsAdmin, STACK_ENV } from "./support";
 import { CLIENT_ID, ISSUER, MOCK_OIDC_ORIGIN, startMockOidc, stopMockOidc } from "./mock-oidc";
 
 /**
@@ -25,8 +25,8 @@ function restartApp(withOidc: boolean): void {
   }
 
   const files = withOidc
-    ? ["-f", "docker-compose.yml", "-f", "e2e/oidc-override.yml"]
-    : ["-f", "docker-compose.yml"];
+    ? [...COMPOSE_FILES, "-f", "e2e/oidc-override.yml"]
+    : COMPOSE_FILES;
 
   const env = {
     ...process.env,

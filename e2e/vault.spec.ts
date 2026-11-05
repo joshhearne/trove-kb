@@ -10,7 +10,7 @@ import {
   VAULT_ITEM_NAME,
   VAULT_ITEM_PASSWORD,
 } from "./fake-vault";
-import { createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
+import { COMPOSE_FILES, createCompany, createDocType, createDocument, signInAsAdmin, STACK_ENV, unique } from "./support";
 
 /**
  * Phase 6. The rules under test come from CLAUDE.md and
@@ -38,7 +38,7 @@ test.describe.configure({ mode: "serial" });
 function compose(args: string[], env: Record<string, string> = {}): void {
   // The overlay is what carries VAULT_MODE in from the shell; the base file
   // deliberately leaves it to the env file.
-  const files = ["-f", "docker-compose.yml", "-f", "e2e/vault-override.yml"];
+  const files = [...COMPOSE_FILES, "-f", "e2e/vault-override.yml"];
   execFileSync("docker", ["compose", "-p", PROJECT, ...files, ...args], {
     cwd: REPO,
     env: { ...process.env, ...env },

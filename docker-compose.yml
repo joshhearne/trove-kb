@@ -1,6 +1,11 @@
 services:
   app:
-    build: .
+    # Published by .github/workflows/images.yml. TROVE_IMAGE_TAG (in .env)
+    # picks the build: a release (v1.4.0), a dev build (dev-<sha7>), or the
+    # floating :stable / :dev. The host updater (updater/) manages it once
+    # installed. To build from this checkout instead, add
+    # -f docker-compose.build.yml (see that file).
+    image: ${TROVE_IMAGE:-ghcr.io/joshhearne/trove-kb}:${TROVE_IMAGE_TAG:-stable}
     restart: unless-stopped
     # ENV_FILE lets a second stack on this host (a test copy, a staging copy)
     # run from its own file without touching the deployment's .env.
