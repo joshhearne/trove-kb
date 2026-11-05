@@ -487,25 +487,34 @@ A user-visible change adds a file to `changes/` in the same pull request; it
 becomes that change's line in the What's new window (`changes/README.md`).
 
 The footer names the build that is running: the release, `v1.2.3`, or
-`dev-<sha7>` for a dev build. A release's version comes from `package.json`,
-so set it first, then tag it the same:
+`dev-<sha7>` for a dev build. Both branches take changes only through pull
+requests with green checks (the repository's rulesets), so a release is three
+small steps:
 
-```bash
-git checkout main && git pull
-git merge --no-ff origin/dev -m "Release 0.2.0"
-npm version 0.2.0 --no-git-tag-version   # package.json and the lockfile
-git commit -sam "Release 0.2.0"
-git tag v0.2.0 && git push origin main v0.2.0
-git checkout dev && git merge --ff-only main && git push origin dev   # keep dev on top of main
-```
+1. **Set the version on `dev`.** A pull request into `dev` that runs
+   `npm version 0.2.0 --no-git-tag-version` (package.json and the lockfile)
+   and adds nothing else.
+2. **Release `dev` into `main`.** A pull request from `dev` into `main`,
+   titled "Release 0.2.0", merged with a merge commit (the only method `main`
+   allows). Then tag that merge commit:
 
-The Release workflow refuses a tag that does not match `package.json`, then
-publishes the notes; the Images workflow publishes the image.
+   ```bash
+   git fetch origin && git tag v0.2.0 origin/main && git push origin v0.2.0
+   ```
+
+   The tag runs the Release workflow (notes, and a refusal if the tag doesn't
+   match `package.json`) and the Images workflow (`:v0.2.0` and `:stable`).
+3. **Bring `main` back into `dev`.** A pull request from `main` into `dev`,
+   merged with a merge commit, so `dev` contains the release's merge commit.
+   Without it, a server moving from Production to Development would see the
+   dev build as older than its release and wait (the updater never installs
+   a build that isn't a descendant of the running one).
 
 One-time GitHub settings: create the **development** and **production**
-environments (Settings → Environments) and add required reviewers or branch
-rules to **production** if releases should need an approval; protect `main`
-and `dev`. The first image publish creates the `trove-kb` package on GHCR as
+environments (Settings → Environments). Give **production** a deployment rule
+for tags matching `v*`, and required reviewers if a release should need an
+approval; a tag ruleset on `v*` limits who can cut one, since a tag is what
+reaches Production servers. The first image publish creates the `trove-kb` package on GHCR as
 private: make it public (Package settings → Change visibility) so servers can
 pull it without logging in.
 
