@@ -813,7 +813,7 @@ export const enUS = {
       moved: "Moved.",
       noOtherCollections: "There is no other collection to move it to.",
       file: "File",
-      editText: "Edit text",
+      editText: "This is a text file: change it with Edit at the top of the article.",
       download: "Download file",
       noFile: "The file this came from isn't kept.",
       upload: "Upload a new version",

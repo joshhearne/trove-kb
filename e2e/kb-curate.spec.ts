@@ -41,7 +41,8 @@ test("an imported file is filed under a category that later imports keep", async
 test("an imported text file opens in the editor, and the import leaves the edit alone", async ({ page }) => {
   await signInAsAdmin(page);
   await page.goto(`/kb/articles/${articleId}`);
-  await page.locator("#manage").getByRole("link", { name: "Edit text" }).click();
+  await expect(page.locator("#manage").getByText("This is a text file")).toBeVisible();
+  await page.getByRole("link", { name: "Edit", exact: true }).click();
   await expect(page).toHaveURL(/\/edit$/);
   await page.locator("textarea[name=body]").fill("Uplinks on 49 and 50.");
   await page.getByRole("button", { name: /^Save/ }).click();

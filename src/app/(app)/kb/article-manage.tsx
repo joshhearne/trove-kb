@@ -4,7 +4,7 @@ import { useActionState, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Download, FileUp, History, Pencil, Trash2 } from "lucide-react";
+import { Download, FileUp, History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -33,7 +33,7 @@ export type ArticleManageProps = {
   categories: { category: string | null; subcategory: string | null }[];
   /** Every other collection it could move to. */
   collections: { id: string; name: string }[];
-  /** For a text file: the editor. */
+  /** For a text file, which is edited with Edit at the top of the article. */
   editHref: string | null;
   /** The file it came from, when it is kept. */
   downloadHref: string | null;
@@ -167,15 +167,8 @@ export function ArticleManage(props: ArticleManageProps) {
       <div className={section}>
         <h3 className={heading}>{t.file}</h3>
         <div className="flex flex-wrap items-center gap-3">
-          {props.editHref && (
-            <Link
-              href={props.editHref as Route}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-[var(--muted)]"
-            >
-              <Pencil className="size-4" aria-hidden />
-              {t.editText}
-            </Link>
-          )}
+          {/* A text file is edited with Edit at the top of the article: one link, not two. */}
+          {props.editHref && <p className={hint}>{t.editText}</p>}
           {props.downloadHref ? (
             <a
               href={props.downloadHref}
