@@ -361,6 +361,18 @@ export function buildOpenApiDocument(baseUrl: string) {
           responses: { "200": ok("The article"), ...ERRORS },
         },
       },
+      "/kb/articles/{id}/original": {
+        parameters: [idParam],
+        get: {
+          tags: ["Knowledge base"],
+          summary: "Download the document an imported article was made from",
+          description:
+            "The original file (PDF, Word, …) for an article with a `source_type`, served with its own content type. " +
+            "PDFs are served inline, so a viewer honours `#page=` and `#search=`. 404 when the article has no original.",
+          parameters: [AUDIENCE_PARAM],
+          responses: { "200": { description: "The file" }, "304": { description: "Unchanged (If-None-Match)" }, ...ERRORS },
+        },
+      },
       "/kb/articles/{id}/reactions": {
         parameters: [idParam, READER_PARAM, AUDIENCE_PARAM],
         get: {
