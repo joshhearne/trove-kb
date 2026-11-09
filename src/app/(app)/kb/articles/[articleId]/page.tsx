@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyLink } from "@/components/ui/copy-link";
 import { KbArticle } from "@/components/kb-article";
@@ -16,6 +16,12 @@ import { readerReaction } from "@/server/services/kb-reactions";
 import { getI18n } from "@/i18n/server";
 import { setArticlePublicHiddenAction, toggleFavoriteAction, voteAction } from "../../actions";
 import { isAdministrator } from "@/server/auth/roles";
+import { listCategories, listCollections } from "@/server/services/kb";
+import { listRevisions } from "@/server/services/kb-revisions";
+import { isTextArticle } from "@/server/services/kb-curate";
+import { originalOf } from "@/server/services/kb-import";
+import { formatDateTime } from "@/i18n/format";
+import { ArticleManage, type ManageHistoryRow } from "../../article-manage";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +45,62 @@ export default async function ArticlePage({
     getI18n(),
   ]);
 
+  const admin = isAdministrator(user.role);
+  // A text file is edited in the editor: one written here by whoever may
+  // write, one an import brought in by an administrator.
+  const editable =
+    (canWrite && !!article.externalId && article.format === "markdown") ||
+    (admin && isTextArticle(article.sourceType));
+  const editHref = editable ? `/kb/articles/${article.id}/edit` : null;
+
+  let manage: React.ReactNode = null;
+  if (admin) {
+    const reader = { scope, via: "app" as const, userId: user.id };
+    const [categories, collections, revisions] = await Promise.all([
+      listCategories(article.collectionId, reader),
+      listCollections(reader),
+      listRevisions(article.id),
+    ]);
+    const m = t.kb.manage;
+    const history: ManageHistoryRow[] = revisions.map((revision) => {
+      const detail = revision.detail;
+      const place = [detail.category, detail.subcategory].filter(Boolean).join(" › ");
+      return {
+        id: revision.id,
+        action: revision.action,
+        who: revision.userName ?? revision.actorName,
+        when: formatDateTime(revision.createdAt, locale),
+        detail:
+          revision.action === "moved" && typeof detail.from === "string" && typeof detail.to === "string"
+            ? m.movedDetail(detail.from, detail.to)
+            : revision.action === "recategorized"
+              ? m.filedDetail(place || m.none)
+              : revision.action === "replaced" && typeof detail.file === "string"
+                ? detail.file
+                : null,
+        viewHref: revision.hasBody ? `/kb/articles/${article.id}/history/${revision.id}` : null,
+        fileHref: revision.original ? `/api/kb/articles/${article.id}/revisions/${revision.id}` : null,
+      };
+    });
+    manage = (
+      <ArticleManage
+        articleId={article.id}
+        collectionId={article.collectionId}
+        category={article.category ?? ""}
+        subcategory={article.subcategory ?? ""}
+        categories={categories.map((row) => ({ category: row.category, subcategory: row.subcategory }))}
+        collections={collections
+          .filter((collection) => collection.id !== article.collectionId)
+          .map((collection) => ({ id: collection.id, name: collection.name }))}
+        editHref={isTextArticle(article.sourceType) ? editHref : null}
+        downloadHref={originalOf(article.metadata) ? `/api/kb/articles/${article.id}/original` : null}
+        history={history}
+      />
+    );
+  }
+
   return (
+    <div className="flex flex-col gap-8">
     <KbArticle
       article={article}
       backHref={`/kb/${article.collectionId}`}
@@ -51,9 +112,18 @@ export default async function ArticlePage({
           {publicHref && (
             <CopyLink href={publicHref} label={t.kb.publicLink} copiedLabel={t.kb.publicLinkCopied} />
           )}
-          {canWrite && article.externalId && article.format === "markdown" && (
+          {admin && (
+            <a
+              href="#manage"
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-[var(--muted)]"
+            >
+              <Wrench className="size-4" aria-hidden />
+              {t.kb.manage.link}
+            </a>
+          )}
+          {editHref && (
             <Link
-              href={`/kb/articles/${article.id}/edit` as Route}
+              href={editHref as Route}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-[var(--muted)]"
             >
               <Pencil className="size-4" aria-hidden />
@@ -98,5 +168,7 @@ export default async function ArticlePage({
         </>
       }
     />
+    {manage}
+    </div>
   );
 }

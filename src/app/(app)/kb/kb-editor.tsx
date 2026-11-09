@@ -130,6 +130,7 @@ export function KbEditor({
   collectionName,
   canMove,
   moveUnlocked,
+  textOnly = false,
 }: {
   values: EditorValues;
   backHref: string;
@@ -140,6 +141,8 @@ export function KbEditor({
   collectionName: string;
   /** An administrator; moving is theirs to do once unlocked. */
   canMove: boolean;
+  /** An imported text file: its text and place change, nothing else. */
+  textOnly?: boolean;
   /** The second step is fresh, so the move dialog opens. */
   moveUnlocked: boolean;
 }) {
@@ -209,7 +212,7 @@ export function KbEditor({
 
       {values.imported && (
         <p role="note" className="rounded-md border px-3 py-2 text-sm text-[var(--muted-foreground)]">
-          {t.importedNote}
+          {textOnly ? t.importedTextNote : t.importedNote}
         </p>
       )}
 
@@ -268,6 +271,8 @@ export function KbEditor({
         />
       </div>
 
+      {!textOnly && (
+      <>
       <label className="flex items-start gap-3 text-sm">
         <input
           type="checkbox"
@@ -294,6 +299,8 @@ export function KbEditor({
           <span className="block text-xs text-[var(--muted-foreground)]">{t.internalOnlyHint}</span>
         </span>
       </label>
+      </>
+      )}
 
       <Field id={ids.body} label={t.body} hint={t.bodyHint} error={state.fieldErrors?.body ?? preview?.error ?? undefined}>
         <Textarea

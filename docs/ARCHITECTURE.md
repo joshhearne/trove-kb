@@ -627,8 +627,24 @@ appears in the documentation search.
 - **Writing in the app**: administrators, and people granted write, get a Markdown editor at
   `/kb/articles/new?collection=` and `/kb/articles/:id/edit`, the same
   `writeArticle` service a key uses, with a `KbWriter` that names the person.
-  An article is editable only under an `external_id` of its own; one brought
-  in from a file or website is overwritten by its next import.
+  An article is written again only under an `external_id` of its own.
+- **Tidying up an import** (`src/server/services/kb-curate.ts`, administrators,
+  Manage on the article page) works on every article, however it came: file
+  it under a category and section (`placed_manually`, which later imports
+  keep), move it to another collection (a fresh second step), remove it
+  (`archived_at`; restore under Admin → Knowledge base), edit the text of one
+  from a `.md` or `.txt` file in the editor, or upload a new version of any
+  other file, whose text is read again. A removed, moved or edited file is
+  held out of the next import of its old collection (`kb_import_exclusions`,
+  by source key), so a re-import neither brings it back nor writes over the
+  change. Each change keeps what the article was before, text and file
+  included, in `kb_article_revisions`; files are stored by content hash and
+  never deleted, so an earlier version can be downloaded again.
+- **What an import takes**: Markdown, text, PDF, Word (`.docx`) and HTML pages
+  (`.html` / `.htm` whose bytes are an HTML document, converted to Markdown;
+  the file is kept only as a sandboxed download). Anything else in a folder,
+  a Visio drawing or a spreadsheet, is passed over; pictures are kept for the
+  articles that use them. A legacy `.doc` is refused, as an attachment is.
 - Imports and connectors need a filesystem and raw sockets, so on Workers they
   report that they are unavailable. Reading and search work anywhere.
 

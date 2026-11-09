@@ -939,3 +939,37 @@ CREATE TABLE change_entries (
 );
 CREATE INDEX change_entries_release_idx ON change_entries (release_id);
 ALTER TABLE users ADD COLUMN whats_new_seen_release_id integer;
+
+-- ---------- Knowledge base curation ----------
+-- An administrator chose the category, so a re-import keeps it.
+ALTER TABLE kb_articles ADD COLUMN placed_manually boolean NOT NULL DEFAULT false;
+
+-- Files an import of the collection leaves alone: removed, moved elsewhere, or
+-- edited or replaced in Trove KB.
+CREATE TABLE kb_import_exclusions (
+  collection_id uuid NOT NULL REFERENCES kb_collections(id) ON DELETE CASCADE,
+  source_key    text NOT NULL,
+  reason        text NOT NULL CHECK (reason IN ('removed','moved','edited')),
+  article_id    uuid REFERENCES kb_articles(id) ON DELETE SET NULL,
+  created_by    uuid REFERENCES users(id),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (collection_id, source_key)
+);
+
+-- What an article was before each change made in Trove KB, text and file kept.
+CREATE TABLE kb_article_revisions (
+  id            bigserial PRIMARY KEY,
+  article_id    uuid NOT NULL REFERENCES kb_articles(id) ON DELETE CASCADE,
+  action        text NOT NULL CHECK (action IN ('edited','replaced','moved','recategorized','removed','restored')),
+  user_id       uuid REFERENCES users(id),
+  actor_name    text,
+  collection_id uuid NOT NULL,
+  title         text NOT NULL,
+  category      text,
+  subcategory   text,
+  body          text,
+  original      jsonb,
+  detail        jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX kb_article_revisions_article_idx ON kb_article_revisions (article_id, created_at);

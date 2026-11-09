@@ -323,6 +323,13 @@
       "when": 1793895510665,
       "tag": "0045_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794240116815,
+      "tag": "0046_kb_curation",
+      "breakpoints": true
     }
   ]
 }

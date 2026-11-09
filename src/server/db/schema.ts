@@ -1160,6 +1160,11 @@ export const kbArticles = pgTable(
     steps: jsonb("steps").$type<RunbookStep[]>().notNull().default([]),
     /** SHA-256 of the source bytes, so an unchanged file is not rewritten. */
     contentHash: text("content_hash").notNull(),
+    /**
+     * An administrator chose its category and section, so an import that
+     * brings the file again keeps them rather than the folder's.
+     */
+    placedManually: boolean("placed_manually").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     importedAt: timestamp("imported_at", { withTimezone: true })
       .notNull()
@@ -1543,5 +1548,85 @@ export const changeEntries = pgTable(
       sql`${t.audience} IN ('everyone','admins')`,
     ),
     index("change_entries_release_idx").on(t.releaseId),
+  ],
+);
+
+/* ---------- Knowledge base curation ---------- */
+
+export const KB_EXCLUSION_REASONS = ["removed", "moved", "edited"] as const;
+
+/**
+ * Files an import of this collection leaves alone, by the key a re-import
+ * matches on: one an administrator removed, moved to another collection, or
+ * edited or replaced in Trove KB. Without it the next import of the same
+ * folder would bring the file straight back, or write over the change.
+ */
+export const kbImportExclusions = pgTable(
+  "kb_import_exclusions",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => kbCollections.id, { onDelete: "cascade" }),
+    sourceKey: text("source_key").notNull(),
+    reason: text("reason").notNull(),
+    articleId: uuid("article_id").references(() => kbArticles.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(now),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collectionId, t.sourceKey] }),
+    check(
+      "kb_import_exclusions_reason_check",
+      sql`${t.reason} IN ('removed','moved','edited')`,
+    ),
+  ],
+);
+
+export const KB_REVISION_ACTIONS = [
+  "edited",
+  "replaced",
+  "moved",
+  "recategorized",
+  "removed",
+  "restored",
+] as const;
+
+/**
+ * What an article was before each change made to it in Trove KB, and who made
+ * it. The text and the file it had are kept, so an earlier version can be read
+ * or downloaded again; a file is never deleted while a revision names it.
+ */
+export const kbArticleRevisions = pgTable(
+  "kb_article_revisions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => kbArticles.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    /** Who, when it was a key rather than a person. */
+    actorName: text("actor_name"),
+    collectionId: uuid("collection_id").notNull(),
+    title: text("title").notNull(),
+    category: text("category"),
+    subcategory: text("subcategory"),
+    /** The text before an edit or a new file; null when the change left it alone. */
+    body: text("body"),
+    /** The file before a new one was uploaded, as metadata.original holds it. */
+    original: jsonb("original").$type<Record<string, unknown>>(),
+    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(now),
+  },
+  (t) => [
+    check(
+      "kb_article_revisions_action_check",
+      sql`${t.action} IN ('edited','replaced','moved','recategorized','removed','restored')`,
+    ),
+    index("kb_article_revisions_article_idx").on(t.articleId, t.createdAt),
   ],
 );

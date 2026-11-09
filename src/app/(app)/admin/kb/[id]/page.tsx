@@ -29,6 +29,9 @@ import {
 } from "../../kb-actions";
 import { Select } from "@/components/ui/select";
 import { isAdministrator } from "@/server/auth/roles";
+import { appWriter } from "@/server/kb/app-writer";
+import { listRemovedArticles } from "@/server/services/kb-curate";
+import { restoreArticleAction } from "../../../kb/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +40,7 @@ export default async function KbCollectionAdminPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
@@ -67,6 +70,7 @@ export default async function KbCollectionAdminPage({
     listUserGrants(id),
     getI18n(),
   ]);
+  const removed = await listRemovedArticles(id, await appWriter(user));
   const available = !isWorkers();
 
   const endpoint = `${env.APP_URL.replace(/\/+$/, "")}/api/mcp`;
@@ -382,6 +386,33 @@ export default async function KbCollectionAdminPage({
         </div>
         <HideRules collectionId={collection.id} rules={hideRules} />
         <CategoryVisibilityEditor collectionId={collection.id} categories={categoryVisibility} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-medium">{t.kb.manage.removedTitle}</h3>
+          <p className="text-xs text-[var(--muted-foreground)]">{t.kb.manage.removedHint}</p>
+        </div>
+        {removed.length === 0 ? (
+          <p className="text-sm text-[var(--muted-foreground)]">{t.kb.manage.removedEmpty}</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {removed.map((article) => (
+              <li key={article.id} className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1">
+                  {article.title}
+                  <span className="ml-2 text-xs text-[var(--muted-foreground)]">
+                    {article.sourcePath ?? article.sourceType} · {formatDateTime(article.removedAt, locale)}
+                  </span>
+                </span>
+                <form action={restoreArticleAction}>
+                  <input type="hidden" name="articleId" value={article.id} />
+                  <Button type="submit" variant="outline" size="sm">{t.kb.manage.restore}</Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

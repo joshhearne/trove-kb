@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { kbArticles, kbChunks, kbCollections, kbImports } from "@/server/db/schema";
+import { kbArticles, kbChunks, kbCollections, kbImportExclusions, kbImports } from "@/server/db/schema";
 import { writeAudit } from "@/server/services/audit";
 import { chunkText } from "@/server/kb/chunk";
 import { tidyImportedMarkdown } from "@/server/kb/tidy";
@@ -91,6 +91,8 @@ export type OriginalFile = { key: string; mime: string; bytes: number; name: str
 
 const ORIGINAL_MIME: Partial<Record<string, string>> = {
   pdf: "application/pdf",
+  // Served only as a download, sandboxed: never drawn as a page of this site.
+  html: "text/html",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
@@ -108,7 +110,7 @@ export function originalOf(metadata: Record<string, unknown>): OriginalFile | nu
 }
 
 /** Keeps the file beside the article it became, under a key made from its content. */
-async function keepOriginal(
+export async function keepOriginal(
   collectionId: string,
   path: string,
   bytes: Buffer,
@@ -128,8 +130,35 @@ export function sourceKey(externalId: string | null, path: string): string {
 }
 
 /** Postgres text cannot hold a NUL, and extracted PDF text sometimes has one. */
-function clean(text: string): string {
+export function clean(text: string): string {
   return text.includes("\u0000") ? text.replaceAll("\u0000", "") : text;
+}
+
+type ChunkExecutor = Pick<typeof db, "insert" | "delete">;
+
+/** Replaces an article's search chunks with ones cut from this text. */
+export async function rewriteChunks(
+  tx: ChunkExecutor,
+  articleId: string,
+  collectionId: string,
+  title: string,
+  body: string,
+  extraction: string,
+): Promise<void> {
+  await tx.delete(kbChunks).where(eq(kbChunks.articleId, articleId));
+  const chunks = extraction === "ok" ? chunkText(body) : [];
+  for (let at = 0; at < chunks.length; at += CHUNK_BATCH) {
+    await tx.insert(kbChunks).values(
+      chunks.slice(at, at + CHUNK_BATCH).map((chunk) => ({
+        articleId,
+        collectionId,
+        ordinal: chunk.ordinal,
+        title,
+        heading: chunk.heading.slice(0, 500),
+        content: chunk.content,
+      })),
+    );
+  }
 }
 
 /** What the manifest says about an article's attachments, for its metadata. */
@@ -151,12 +180,28 @@ function unextractedAttachments(metadata: Record<string, unknown>): string[] {
  * key. Everything that adds to a collection ends here — an upload, a
  * connector, a tool call — so an article is chunked and indexed one way.
  */
+/** The keys an import of this collection leaves alone (kb_import_exclusions). */
+export async function excludedKeys(collectionId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ sourceKey: kbImportExclusions.sourceKey })
+    .from(kbImportExclusions)
+    .where(eq(kbImportExclusions.collectionId, collectionId));
+  return new Set(rows.map((row) => row.sourceKey));
+}
+
+/**
+ * Writes an article under its key. `writerPlaces` is for a writer that says
+ * where the article goes (the editor, a key): what it says stands, and the
+ * article stops counting as placed by hand. An import or a connector only
+ * proposes a place, so one an administrator chose is kept.
+ */
 export async function storeArticle(
   collectionId: string,
   key: string,
   path: string | null,
   article: ExtractedArticle,
   contentHash: string,
+  { writerPlaces = false }: { writerPlaces?: boolean } = {},
 ): Promise<string> {
   const title = clean(article.title).slice(0, 500) || "Untitled";
   let body = clean(article.body);
@@ -206,7 +251,17 @@ export async function storeArticle(
       .values({ collectionId, sourceKey: key, ...values })
       .onConflictDoUpdate({
         target: [kbArticles.collectionId, kbArticles.sourceKey],
-        set: { ...values, archivedAt: null, updatedAt: new Date() },
+        set: {
+          ...values,
+          ...(writerPlaces
+            ? { placedManually: false }
+            : {
+                category: sql`case when ${kbArticles.placedManually} then ${kbArticles.category} else excluded.category end`,
+                subcategory: sql`case when ${kbArticles.placedManually} then ${kbArticles.subcategory} else excluded.subcategory end`,
+              }),
+          archivedAt: null,
+          updatedAt: new Date(),
+        },
       })
       .returning({ id: kbArticles.id });
     if (!row) throw new Error("Upsert returned nothing");
@@ -250,6 +305,8 @@ export class ImportRun {
   private byPath = new Map<string, Known>();
   /** Pictures already held, by path, with the hash each arrived with. */
   private pictures = new Map<string, string>();
+  /** Keys an administrator removed, moved away, or took over: the import leaves them alone. */
+  private excluded = new Set<string>();
   private sinceProgress = 0;
 
   private constructor(
@@ -297,6 +354,7 @@ export class ImportRun {
     }
 
     run.pictures = await knownImages(collectionId);
+    run.excluded = await excludedKeys(collectionId);
 
     await db
       .update(kbImports)
@@ -369,7 +427,9 @@ export class ImportRun {
     category: string | null,
     subcategory: string | null,
   ): Promise<boolean> {
-    const known = this.byKey.get(sourceKey(externalId, path));
+    const key = sourceKey(externalId, path);
+    if (this.excluded.has(key)) return false;
+    const known = this.byKey.get(key);
     if (!known || known.archived) return false;
     const [row] = await db
       .update(kbArticles)
@@ -377,6 +437,7 @@ export class ImportRun {
       .where(
         and(
           eq(kbArticles.id, known.id),
+          eq(kbArticles.placedManually, false),
           or(
             sql`${kbArticles.category} is distinct from ${category}`,
             sql`${kbArticles.subcategory} is distinct from ${subcategory}`,
@@ -471,6 +532,7 @@ export class ImportRun {
    */
   async document(path: string, article: ExtractedArticle, bytes: Buffer): Promise<void> {
     const contentHash = createHash("sha256").update(bytes).digest("hex");
+    if (this.excluded.has(sourceKey(article.externalId, path))) return this.skip();
     if (!(article.sourceType in ORIGINAL_MIME)) return this.article(path, article, contentHash);
 
     const known = this.byKey.get(sourceKey(article.externalId, path));
@@ -505,6 +567,8 @@ export class ImportRun {
     force = false,
   ): Promise<void> {
     const key = sourceKey(article.externalId, path);
+    // Removed, moved elsewhere, or edited here by an administrator.
+    if (this.excluded.has(key)) return this.skip();
     const known = this.byKey.get(key);
 
     // The manifest's date is the source's own, to the millisecond; the
@@ -882,6 +946,8 @@ export async function tidyStoredArticles(
         eq(kbArticles.format, "markdown"),
         isNull(kbArticles.archivedAt),
         sql`not (${kbArticles.metadata} ? 'written_by')`,
+        // Text an administrator edited here is theirs now, as it stands.
+        sql`not (${kbArticles.metadata} ? 'edited_by')`,
       ),
     );
 
