@@ -91,9 +91,15 @@ GET    /kb/collections/:id?kind=                           one collection with i
 GET    /kb/search?q=&collection_id=&category=&kind=&limit=&cursor=
 GET    /kb/articles?collection_id=&category=&subcategory=&kind=&updated_since=&sort=&dir=&limit=&cursor=
 GET    /kb/articles/:id                                    full body, kind, steps (runbooks), external_id, source_url, public_url
+GET    /kb/articles/:id/original                           the document an imported article was made from (PDF inline, others as a file); 404 if none
 PUT    /kb/collections/:id/articles/:external_id           upsert { title, body, category?, subcategory?, kind?, source_url?, internal_only? }  (write scope + write grant)
 DELETE /kb/collections/:id/articles/:external_id           archive                                                                    (write scope + write grant)
 ```
+`/original` serves the file with its own content type, `ETag` and
+`If-None-Match`, under the same read rules as the article. It lets an
+integration read a PDF server-side when the public site's copy sits behind a
+sign-in such as Cloudflare Access, which an API client can't pass.
+
 A collection on the public site is readable by every key with no grant, as the
 public sees it (articles held back stay out); a grant adds those, or writing.
 Under Admin → Knowledge base → API access, an administrator sets one key's
