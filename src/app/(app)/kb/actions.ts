@@ -9,12 +9,18 @@ import { getCompanyScope, hasRecentMfa, requireAdmin, requireRecentMfa, requireU
 import { readerKey } from "@/server/kb/identity";
 import { RunbookStepError } from "@/server/kb/runbook";
 import { ForbiddenError, NotFoundError } from "@/server/services/errors";
-import { grantsForUser } from "@/server/services/kb-grants";
 import { moveArticle, writeArticle } from "@/server/services/kb-write";
 import { listCategories } from "@/server/services/kb";
 import { setArticlePublicHidden } from "@/server/services/kb";
 import { setFavorite, setVote } from "@/server/services/kb-reactions";
-import { can, isAdministrator } from "@/server/auth/roles";
+import { isAdministrator } from "@/server/auth/roles";
+import { appWriter } from "@/server/kb/app-writer";
+import {
+  editTextArticle,
+  recategorizeArticle,
+  removeArticle,
+  restoreArticle,
+} from "@/server/services/kb-curate";
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -68,15 +74,7 @@ export async function setArticlePublicHiddenAction(formData: FormData): Promise<
 
 /** The signed-in person as a writer: an administrator may write anywhere; anyone else where granted. */
 async function writerFor() {
-  const user = await requireUser();
-  return {
-    via: "app" as const,
-    scope: await getCompanyScope(user),
-    grants: await grantsForUser(user.id),
-    userId: user.id,
-    userName: user.name,
-    admin: can(user.role, "kb.write"),
-  };
+  return appWriter(await requireUser());
 }
 
 /** `kind-of-thing-3f9a`: a name for an article written here, stable for its life. */
@@ -130,6 +128,24 @@ export async function saveArticleAction(_prev: FormState, formData: FormData): P
       if (!isAdministrator(user.role) || !hasRecentMfa(user)) return { error: "Unlock moving with your second step first" };
       await moveArticle(articleIdGiven, collectionId, writer);
     }
+    // A text file brought in by an import has no name of its own to write
+    // under: its text is edited where it is, and the import leaves it be.
+    if (articleIdGiven && !existingId) {
+      await editTextArticle(
+        articleIdGiven,
+        {
+          title,
+          body: (formData.get("body") as string | null) ?? "",
+          category: text(formData, "category") ?? null,
+          subcategory: text(formData, "subcategory") ?? null,
+        },
+        writer,
+      );
+      revalidatePath(`/kb/${collectionId}`);
+      if (fromCollectionId) revalidatePath(`/kb/${fromCollectionId}`);
+      revalidatePath(`/kb/articles/${articleIdGiven}`);
+      redirect(`/kb/articles/${articleIdGiven}` as Route);
+    }
     const result = await writeArticle(
       {
         collectionId,
@@ -155,3 +171,68 @@ export async function saveArticleAction(_prev: FormState, formData: FormData): P
   revalidatePath(`/kb/articles/${articleId}`);
   redirect(`/kb/articles/${articleId}`);
 }
+
+/* ---------- Tidying an article up: any article, however it came ---------- */
+
+/** Files an article under a category and section. */
+export async function recategorizeArticleAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const articleId = text(formData, "articleId") ?? "";
+  if (!UUID.test(articleId)) return { error: "Not found" };
+  try {
+    await requireAdmin();
+    await recategorizeArticle(
+      articleId,
+      { category: text(formData, "category") ?? null, subcategory: text(formData, "subcategory") ?? null },
+      await writerFor(),
+    );
+  } catch (err) {
+    if (err instanceof ZodError) return { fieldErrors: toFieldErrors(err) };
+    if (err instanceof NotFoundError || err instanceof ForbiddenError) return { error: err.message };
+    throw err;
+  }
+  revalidatePath(`/kb/articles/${articleId}`);
+  revalidatePath("/kb", "layout");
+  return { ok: true };
+}
+
+/** Moves an article to another collection: an administrator's step, with the second factor fresh. */
+export async function relocateArticleAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const articleId = text(formData, "articleId") ?? "";
+  const toCollectionId = text(formData, "collectionId") ?? "";
+  if (!UUID.test(articleId) || !UUID.test(toCollectionId)) return { error: "Choose a collection" };
+  const user = await requireAdmin();
+  await requireRecentMfa(user, `/kb/articles/${articleId}#manage`);
+  try {
+    await moveArticle(articleId, toCollectionId, await writerFor());
+  } catch (err) {
+    if (err instanceof NotFoundError || err instanceof ForbiddenError) return { error: err.message };
+    throw err;
+  }
+  revalidatePath(`/kb/articles/${articleId}`);
+  revalidatePath("/kb", "layout");
+  return { ok: true };
+}
+
+/** Takes an article out of the knowledge base, and keeps its file out of later imports. */
+export async function removeArticleAction(formData: FormData): Promise<void> {
+  const articleId = text(formData, "articleId") ?? "";
+  const back = text(formData, "collectionId") ?? "";
+  if (!UUID.test(articleId)) return;
+  const user = await requireAdmin();
+  await requireRecentMfa(user, `/kb/articles/${articleId}#manage`);
+  await removeArticle(articleId, await writerFor());
+  revalidatePath("/kb", "layout");
+  redirect((UUID.test(back) ? `/kb/${back}` : "/kb") as Route);
+}
+
+/** Puts a removed article back. */
+export async function restoreArticleAction(formData: FormData): Promise<void> {
+  const articleId = text(formData, "articleId") ?? "";
+  if (!UUID.test(articleId)) return;
+  await requireAdmin();
+  await restoreArticle(articleId, await writerFor());
+  revalidatePath("/kb", "layout");
+  revalidatePath("/admin/kb", "layout");
+  redirect(`/kb/articles/${articleId}` as Route);
+}
+

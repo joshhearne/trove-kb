@@ -188,6 +188,15 @@ read as its source did: numbered steps keep counting past a screenshot, a
 site's own menus and buttons are dropped, and an embedded video plays in the
 article.
 
+An import can be tidied up afterwards, article by article, whatever it came
+from: an administrator files it under a category, moves it to another
+collection, removes a file that was never meant to come in, edits the text of
+a Markdown or text file, or uploads a new version of a PDF or Word document.
+The next import of the same folder leaves those changes alone, and every
+change is kept in the article's history, earlier files included. Imports take
+Markdown, text, PDF, Word (.docx) and HTML; anything else in the folder is
+passed over.
+
 Articles can also be written in Trove KB, by administrators and by people
 granted a collection by name. A **runbook** is an article whose lists are a
 procedure: every step carries a stable id, written into the body, so a

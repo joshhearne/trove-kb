@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zipSync } from "fflate";
-import { categoryFromPath, extractArticle, NotAnArticleError, safeUrl } from "./extract";
+import { categoryFromPath, extractArticle, looksLikeHtml, NotAnArticleError, safeUrl } from "./extract";
 
 const md = (text: string) => Buffer.from(text, "utf8");
 
@@ -137,6 +137,38 @@ describe("extractArticle", () => {
       NotAnArticleError,
     );
     await expect(extractArticle("empty.md", Buffer.alloc(0))).rejects.toBeInstanceOf(NotAnArticleError);
+  });
+});
+
+describe("HTML files", () => {
+  const page = `<!DOCTYPE html>
+<html><head><title>Reset a VPN token</title></head>
+<body><nav><a href="#a">Contents</a></nav><main><h1>Reset a VPN token</h1>
+<ol><li>Open the portal.</li><li>Choose <strong>Reset</strong>.</li></ol></main></body></html>`;
+
+  it("becomes a Markdown article, titled by the page", async () => {
+    const article = await extractArticle("Remote/VPN/reset.html", md(page));
+    expect(article.sourceType).toBe("html");
+    expect(article.format).toBe("markdown");
+    expect(article.title).toBe("Reset a VPN token");
+    expect(article.body).toMatch(/^1\.\s+Open the portal\.$/m);
+    expect(article.body).toContain("**Reset**");
+    expect(article.category).toBe("Remote");
+    expect(article.subcategory).toBe("VPN");
+  });
+
+  it("goes by the bytes: a file named .html that is not a page is passed over", async () => {
+    await expect(extractArticle("notes.html", md("just some words"))).rejects.toBeInstanceOf(NotAnArticleError);
+    await expect(extractArticle("drawing.htm", Buffer.from([0x50, 0x4b, 3, 4, 0, 0]))).rejects.toBeInstanceOf(
+      NotAnArticleError,
+    );
+  });
+
+  it("knows a page by how it starts", () => {
+    expect(looksLikeHtml(md("\uFEFF<!doctype html><p>x</p>"))).toBe(true);
+    expect(looksLikeHtml(md("<!-- exported -->\n<html lang=en>"))).toBe(true);
+    expect(looksLikeHtml(md("<p>no document around it</p>"))).toBe(false);
+    expect(looksLikeHtml(md("# Markdown"))).toBe(false);
   });
 });
 

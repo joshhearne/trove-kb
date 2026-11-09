@@ -6,6 +6,12 @@ import { asDate, asText, parseFrontmatter } from "@/server/kb/frontmatter";
 /**
  * Turns one file into an article. What the file is comes from its own bytes,
  * by the same rules an attachment is held to; the name only proposes.
+ *
+ * Documents only: Markdown, text, PDF, Word (.docx) and HTML pages. Anything
+ * else in a folder (a Visio drawing, a spreadsheet, an installer) is not an
+ * article and is passed over; pictures are kept for the articles that use them.
+ * A legacy Word file (.doc) is refused, as an attachment is, since it can
+ * carry macros and there is no reader for its text here.
  */
 
 export type SourceType = "md" | "txt" | "pdf" | "docx" | "html";
@@ -201,7 +207,40 @@ async function fromDocx(path: string, bytes: Buffer): Promise<ExtractedArticle> 
   return article;
 }
 
+/**
+ * An HTML page saved as a file: a help article exported from somewhere, a
+ * formatted procedure. Taken only when its bytes are an HTML document; the
+ * name ending in .html is not enough. It becomes Markdown, as a crawled page
+ * does, and nothing of the page runs or is drawn as it was.
+ */
+export function looksLikeHtml(bytes: Buffer): boolean {
+  if (bytes.includes(0)) return false;
+  const head = bytes.subarray(0, 4096).toString("utf8").replace(/^\uFEFF/, "").trimStart().toLowerCase();
+  return /^(<!--[\s\S]*?-->\s*)*<(!doctype html|html|head|body)[\s>]/.test(head);
+}
+
+async function fromHtml(path: string, bytes: Buffer): Promise<ExtractedArticle> {
+  const { htmlToMarkdown, mainContent, pageTitle } = await import("@/server/kb/html");
+  const html = bytes.toString("utf8");
+  const body = htmlToMarkdown(mainContent(html));
+  const article = bare(path, "html");
+  if (body.replace(/\s/g, "").length < MIN_CHARS_PER_PAGE) {
+    article.extraction = "unextracted";
+    return article;
+  }
+  article.body = body;
+  article.title = pageTitle(html) ?? firstHeading(body) ?? article.title;
+  return article;
+}
+
+const HTML_EXTENSIONS = new Set(["html", "htm"]);
+
 export async function extractArticle(path: string, bytes: Buffer): Promise<ExtractedArticle> {
+  if (HTML_EXTENSIONS.has(extname(path).slice(1).toLowerCase())) {
+    if (!looksLikeHtml(bytes)) throw new NotAnArticleError("The file is named .html but is not an HTML page");
+    return fromHtml(path, bytes);
+  }
+
   let accepted;
   try {
     accepted = await acceptUpload(basename(path), bytes, async () => {

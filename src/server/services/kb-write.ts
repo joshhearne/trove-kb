@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { kbArticles, kbChunks, kbCollections, kbImages } from "@/server/db/schema";
+import { kbArticles, kbChunks, kbCollections, kbImages, kbImportExclusions } from "@/server/db/schema";
 import { picturesOf } from "@/server/services/kb-images";
 import { writeAudit } from "@/server/services/audit";
 import { applyVisibility } from "@/server/services/kb-visibility";
@@ -14,6 +14,7 @@ import { ARTICLE_KINDS } from "@/server/kb/extract";
 import { sourceKey, storeArticle } from "@/server/services/kb-import";
 import { safeUrl } from "@/server/kb/extract";
 import { grantsForUser, type KbGrant } from "@/server/services/kb-grants";
+import { recordRevision, type RevisionActor } from "@/server/services/kb-revisions";
 import type { CompanyScope } from "@/server/auth/company-scope";
 import { can } from "@/server/auth/roles";
 
@@ -97,6 +98,13 @@ function writerName(writer: KbWriter): string {
   return writer.via === "app" ? writer.userName : writer.keyName;
 }
 
+/** The writer as an article's history names it. */
+export function revisionActor(writer: KbWriter): RevisionActor {
+  return writer.via === "app"
+    ? { userId: writer.userId, name: writer.userName }
+    : { userId: null, name: writer.keyName };
+}
+
 /**
  * The collection, if this key may write to it. One it cannot see is not
  * found; one it can see and may not change is forbidden, and says why,
@@ -147,6 +155,10 @@ export async function writeArticle(
       archivedAt: kbArticles.archivedAt,
       dateCreated: kbArticles.dateCreated,
       publicHidden: kbArticles.publicHidden,
+      title: kbArticles.title,
+      body: kbArticles.body,
+      category: kbArticles.category,
+      subcategory: kbArticles.subcategory,
     })
     .from(kbArticles)
     .where(and(eq(kbArticles.collectionId, data.collectionId), eq(kbArticles.sourceKey, key)))
@@ -179,7 +191,24 @@ export async function writeArticle(
       metadata: { written_by: writerName(writer) },
     },
     contentHash,
+    { writerPlaces: true },
   );
+
+  // What it said before, for its history. A change of the public setting alone is not an edit.
+  if (existing && !unchanged) {
+    await recordRevision(
+      "edited",
+      {
+        id: existing.id,
+        collectionId: data.collectionId,
+        title: existing.title,
+        category: existing.category,
+        subcategory: existing.subcategory,
+        body: existing.body,
+      },
+      revisionActor(writer),
+    );
+  }
 
   if (data.publicHidden !== undefined) {
     await db
@@ -299,10 +328,10 @@ export async function userMayWrite(user: { id: string; role: string }, collectio
 /**
  * Moves an article to another collection, with the pictures it refers to:
  * a picture belongs to a collection, so each one the article uses is held
- * in the new collection too, under the same stored file. The article keeps
- * its name, so the next import of it under the old collection makes a new
- * one there; that is what a move means. The new collection's hide rules
- * apply on arrival.
+ * in the new collection too, under the same stored file. The new
+ * collection's hide rules apply on arrival, and the next import of the old
+ * collection leaves the file out (kb_import_exclusions) rather than making a
+ * second copy there.
  */
 export async function moveArticle(articleId: string, toCollectionId: string, writer: KbWriter): Promise<void> {
   const reader = readerFor(writer);
@@ -322,11 +351,39 @@ export async function moveArticle(articleId: string, toCollectionId: string, wri
       .limit(1);
     if (clash) throw new ForbiddenError(`"${target.name}" already holds an article with this name`);
 
-    await tx
+    const [moved] = await tx
       .update(kbArticles)
       .set({ collectionId: toCollectionId, updatedAt: new Date() })
-      .where(eq(kbArticles.id, articleId));
+      .where(eq(kbArticles.id, articleId))
+      .returning({ sourceKey: kbArticles.sourceKey });
     await tx.update(kbChunks).set({ collectionId: toCollectionId }).where(eq(kbChunks.articleId, articleId));
+
+    // The next import of the old collection must not bring the file back
+    // there; arriving here, nothing holds it out any more.
+    const userId = writer.via === "app" ? writer.userId : null;
+    await tx
+      .insert(kbImportExclusions)
+      .values({ collectionId: article.collectionId, sourceKey: moved!.sourceKey, reason: "moved", articleId, createdBy: userId })
+      .onConflictDoUpdate({
+        target: [kbImportExclusions.collectionId, kbImportExclusions.sourceKey],
+        set: { reason: "moved", articleId, createdBy: userId, createdAt: new Date() },
+      });
+    await tx
+      .delete(kbImportExclusions)
+      .where(and(eq(kbImportExclusions.collectionId, toCollectionId), eq(kbImportExclusions.sourceKey, moved!.sourceKey)));
+    await recordRevision(
+      "moved",
+      {
+        id: articleId,
+        collectionId: article.collectionId,
+        title: article.title,
+        category: article.category,
+        subcategory: article.subcategory,
+      },
+      revisionActor(writer),
+      { from: article.collectionName, to: target.name },
+      tx,
+    );
 
     if (pictures.size > 0) {
       const rows = await tx

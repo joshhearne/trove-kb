@@ -5,6 +5,7 @@ import { userMayWrite } from "@/server/services/kb-write";
 import { getI18n } from "@/i18n/server";
 import { KbEditor } from "../../../kb-editor";
 import { isAdministrator } from "@/server/auth/roles";
+import { isTextArticle } from "@/server/services/kb-curate";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,13 @@ export default async function EditArticlePage({
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) notFound();
   const reader: KbReader = { scope, via: "app", userId: user.id };
   const article = await getArticle(articleId, reader);
-  // Only an article with a name of its own can be written again under it.
-  if (!article || !article.externalId || article.format !== "markdown") notFound();
+  if (!article) notFound();
+  // An article with a name of its own is written again under it, by whoever
+  // may write there. A text file an import brought in is edited in place,
+  // by an administrator; anything else gets a new file, not an edit.
+  const written = !!article.externalId && article.format === "markdown";
+  const importedText = !written && isAdministrator(user.role) && isTextArticle(article.sourceType);
+  if (!written && !importedText) notFound();
   if (!(await userMayWrite(user, article.collectionId))) notFound();
   const canMove = isAdministrator(user.role);
   const [categories, collections, { messages: t }] = await Promise.all([
@@ -43,11 +49,12 @@ export default async function EditArticlePage({
         collections={collections.map((row) => ({ id: row.id, name: row.name }))}
         collectionName={article.collectionName}
         canMove={canMove}
+        textOnly={importedText}
         moveUnlocked={canMove && unlock === "move" && hasRecentMfa(user)}
         values={{
           articleId: article.id,
           collectionId: article.collectionId,
-          externalId: article.externalId,
+          externalId: written ? (article.externalId ?? undefined) : undefined,
           title: article.title,
           category: article.category ?? "",
           subcategory: article.subcategory ?? "",
