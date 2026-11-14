@@ -444,8 +444,36 @@ switch_current() {
 
 restart_service() { sudo -n systemctl restart "$SERVICE"; }
 
+# Docker: the optional sidecars (bw-serve, 1Password Connect) run under compose
+# profiles, which a plain `docker compose up` leaves alone: they keep running,
+# but never pick up changes to their definitions. Unless .env sets
+# COMPOSE_PROFILES, turn on every profile that has a service running now, so
+# `up` applies the new build's sidecar definitions too (and the rollback the
+# old ones). A sidecar someone stopped stays stopped.
+keep_running_profiles() {
+  [ -n "${COMPOSE_PROFILES:-}" ] && return 0
+  [ -n "$(env_get COMPOSE_PROFILES)" ] && return 0
+  local running base profiles profile svc active=""
+  running="$(docker compose ps --services --status running 2>/dev/null)" || return 0
+  base="$(docker compose config --services 2>/dev/null)" || return 0
+  profiles="$(docker compose config --profiles 2>/dev/null)" || return 0
+  for profile in $profiles; do
+    for svc in $(docker compose --profile "$profile" config --services 2>/dev/null); do
+      if ! grep -qxF "$svc" <<<"$base" && grep -qxF "$svc" <<<"$running"; then
+        active="${active:+$active,}$profile"
+        break
+      fi
+    done
+  done
+  if [ -n "$active" ]; then
+    export COMPOSE_PROFILES="$active"
+    log "keeping compose profiles: $active"
+  fi
+}
+
 deploy() {
   local commit="$1" tag="$2"
+  [ "$MODE" = docker ] && keep_running_profiles
   git checkout --quiet --detach "$commit"
   if [ "$MODE" = docker ]; then
     env_set TROVE_IMAGE_TAG "$tag"
