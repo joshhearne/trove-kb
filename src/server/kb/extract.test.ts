@@ -114,7 +114,7 @@ describe("extractArticle", () => {
 
   it("reads the text layer of a PDF", async () => {
     const article = await extractArticle("guides/printing.pdf", pdf("Exporting a configuration report"));
-    expect(article).toMatchObject({ sourceType: "pdf", extraction: "ok", format: "text" });
+    expect(article).toMatchObject({ sourceType: "pdf", extraction: "ok", format: "markdown" });
     expect(article.body).toContain("Exporting a configuration report");
   });
 
@@ -129,6 +129,16 @@ describe("extractArticle", () => {
       pdf("Remote staff connect through the SSL-VPN.", { heading: "Set up SSL-VPN", title: "Document1" }),
     );
     expect(article.title).toBe("Set up SSL-VPN");
+  });
+
+  it("gives a PDF's body Markdown headings from its type sizes", async () => {
+    const article = await extractArticle(
+      "guides/vpn.pdf",
+      pdf("Remote staff connect through the SSL-VPN.", { heading: "Set up SSL-VPN" }),
+    );
+    expect(article.body).toBe(
+      "# Set up SSL-VPN\n\nRemote staff connect through the SSL-VPN. Remote staff connect through the SSL-VPN.",
+    );
   });
 
   it("falls back to the PDF's Title, then the file name", async () => {
