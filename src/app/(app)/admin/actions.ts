@@ -125,15 +125,21 @@ export async function updateTemplateFieldAction(
   const docTypeId = text(formData, "docTypeId");
   if (!id || !docTypeId) return { error: "Missing field" };
 
+  let conversion: { converted: number; kept: number };
   try {
     const user = await requireDocTypeManager();
-    await updateTemplateField(id, templateFieldInput(formData), user.id);
+    conversion = await updateTemplateField(id, templateFieldInput(formData), user.id);
   } catch (err) {
     return toFormState(err);
   }
 
   revalidatePath(`/admin/doc-types/${docTypeId}`);
-  redirect(`/admin/doc-types/${docTypeId}`);
+  const { converted, kept } = conversion;
+  redirect(
+    converted > 0 || kept > 0
+      ? `/admin/doc-types/${docTypeId}?converted=${converted}&kept=${kept}`
+      : `/admin/doc-types/${docTypeId}`,
+  );
 }
 
 export async function archiveFieldAction(formData: FormData): Promise<void> {

@@ -29,11 +29,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function DocTypePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DocTypePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ converted?: string; kept?: string }>;
+}) {
   const user = await requireUser();
   if (!canManageDocTypes(user.role)) redirect("/companies");
 
   const { id } = await params;
+  const { converted, kept } = await searchParams;
+  const conversion = { converted: Number(converted) || 0, kept: Number(kept) || 0 };
   const docType = await getDocType(id);
   if (!docType) notFound();
 
@@ -84,6 +92,19 @@ export default async function DocTypePage({ params }: { params: Promise<{ id: st
           </form>
         )}
       </div>
+
+      {conversion.converted + conversion.kept > 0 && (
+        <p
+          role="status"
+          className={
+            conversion.kept > 0
+              ? "rounded-md border px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+              : "rounded-md border px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+          }
+        >
+          {t.admin.docTypes.valuesConverted(conversion.converted, conversion.kept)}
+        </p>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">{t.admin.docTypes.details}</h2>

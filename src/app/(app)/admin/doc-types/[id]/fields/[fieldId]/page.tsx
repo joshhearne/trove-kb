@@ -43,6 +43,9 @@ export default async function EditTemplateFieldPage({
         {t.companies.editHeading(field.label)}
       </h1>
         <p className="text-sm text-[var(--muted-foreground)]">{docType.name}</p>
+        <p className="mt-2 max-w-xl text-sm text-[var(--muted-foreground)]">
+          {t.admin.docTypes.typeChangeHint}
+        </p>
       </div>
       <EditTemplateFieldForm
         docTypeId={docType.id}
