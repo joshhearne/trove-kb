@@ -4,9 +4,17 @@ import { categoryFromPath, extractArticle, looksLikeHtml, NotAnArticleError, saf
 
 const md = (text: string) => Buffer.from(text, "utf8");
 
-/** The smallest PDF that opens: one page, with or without a line of text. */
-function pdf(text: string | null): Buffer {
-  const stream = text ? `BT /F1 12 Tf 72 720 Td (${text}) Tj ET` : "";
+/**
+ * The smallest PDF that opens: one page, with or without a line of text, and
+ * optionally a large heading above it and a Title in its document info.
+ */
+function pdf(text: string | null, { heading, title }: { heading?: string; title?: string } = {}): Buffer {
+  const lines = [
+    heading ? `BT /F1 24 Tf 72 740 Td (${heading}) Tj ET` : "",
+    text ? `BT /F1 12 Tf 72 700 Td (${text}) Tj ET` : "",
+    text ? `BT /F1 12 Tf 72 684 Td (${text}) Tj ET` : "",
+  ];
+  const stream = lines.filter(Boolean).join("\n");
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -14,6 +22,7 @@ function pdf(text: string | null): Buffer {
     `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
   ];
+  if (title !== undefined) objects.push(`<< /Title (${title}) >>`);
 
   let body = "%PDF-1.4\n";
   const offsets = objects.map((object, index) => {
@@ -25,7 +34,8 @@ function pdf(text: string | null): Buffer {
   const xref = body.length;
   body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (const offset of offsets) body += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  const info = title !== undefined ? ` /Info ${objects.length} 0 R` : "";
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${info} >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(body, "latin1");
 }
 
@@ -111,6 +121,33 @@ describe("extractArticle", () => {
   it("flags a PDF with no text layer instead of failing", async () => {
     const article = await extractArticle("scans/brochure.pdf", pdf(null));
     expect(article).toMatchObject({ extraction: "unextracted", body: "", title: "brochure" });
+  });
+
+  it("titles a PDF by the heading on its first page", async () => {
+    const article = await extractArticle(
+      "exports/KB-00417_final.pdf",
+      pdf("Remote staff connect through the SSL-VPN.", { heading: "Set up SSL-VPN", title: "Document1" }),
+    );
+    expect(article.title).toBe("Set up SSL-VPN");
+  });
+
+  it("falls back to the PDF's Title, then the file name", async () => {
+    const titled = await extractArticle(
+      "exports/KB-00417_final.pdf",
+      pdf("Remote staff connect through the SSL-VPN.", { title: "Set up SSL-VPN for remote staff" }),
+    );
+    expect(titled.title).toBe("Set up SSL-VPN for remote staff");
+
+    const placeholder = await extractArticle(
+      "exports/KB-00417_final.pdf",
+      pdf("Remote staff connect through the SSL-VPN.", { title: "Microsoft Word - KB-00417.docx" }),
+    );
+    expect(placeholder.title).toBe("KB 00417 final");
+  });
+
+  it("keeps a scanned PDF's Title even with no text layer", async () => {
+    const article = await extractArticle("scans/brochure.pdf", pdf(null, { title: "Fall service brochure" }));
+    expect(article).toMatchObject({ extraction: "unextracted", title: "Fall service brochure" });
   });
 
   it("goes by the bytes, not the name", async () => {
