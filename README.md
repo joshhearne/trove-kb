@@ -92,6 +92,10 @@ anything, adds `TROVE_UPDATER_TOKEN` to `.env`, starts the stack, and enables
 the timer. Extra compose files (NFS, say) go in `.env` as
 `COMPOSE_FILE=docker-compose.yml:docker-compose.nfs.yml`, which the updater's
 `docker compose` reads too.
+Optional sidecars (`--profile vault`, `--profile onepassword`) stay on across
+updates: the updater turns on every profile with a service running and applies
+the new build's definitions to it. To pin the list instead, set
+`COMPOSE_PROFILES=vault` (comma-separated) in `.env`.
 
 **Bare metal** (no Docker: Node 22, npm, git, PostgreSQL, and `pg_dump` for the
 backups):
