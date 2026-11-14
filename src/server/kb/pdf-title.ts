@@ -6,6 +6,9 @@ export type PageTextItem = {
   y: number;
   fontSize: number;
   hasEOL: boolean;
+  /** Where the item starts across the page, and how wide it is. */
+  x?: number;
+  width?: number;
 };
 
 const MAX_TITLE = 200;
@@ -58,21 +61,36 @@ export function titleFromPdfInfo(info: Record<string, unknown> | undefined, path
   return clip(title);
 }
 
-type Line = { text: string; fontSize: number; y: number };
+/** One line of a page: its text, the largest size in it, and its baseline. */
+export type Line = {
+  text: string;
+  fontSize: number;
+  y: number;
+  /** Where the line starts and ends across the page, when the PDF says. */
+  left: number | null;
+  right: number | null;
+};
 
-/** Groups a page's text items into lines, top of the page first. */
-function linesOf(items: PageTextItem[]): Line[] {
+/**
+ * Groups a page's text items into lines: top of the page first, or with
+ * `inOrder`, in the order the PDF draws them, which keeps columns apart.
+ */
+export function linesOf(items: PageTextItem[], { inOrder = false }: { inOrder?: boolean } = {}): Line[] {
   const lines: Line[] = [];
   let parts: string[] = [];
   let size = 0;
   let y: number | null = null;
+  let left: number | null = null;
+  let right: number | null = null;
 
   const flush = () => {
     const text = normalize(parts.join(""));
-    if (text !== "" && y !== null) lines.push({ text, fontSize: size, y });
+    if (text !== "" && y !== null) lines.push({ text, fontSize: size, y, left, right });
     parts = [];
     size = 0;
     y = null;
+    left = null;
+    right = null;
   };
 
   for (const item of items) {
@@ -83,6 +101,11 @@ function linesOf(items: PageTextItem[]): Line[] {
       parts.push(item.str);
       size = Math.max(size, item.fontSize);
       y ??= item.y;
+      if (item.x !== undefined) {
+        left = left === null ? item.x : Math.min(left, item.x);
+        const end = item.x + (item.width ?? 0);
+        right = right === null ? end : Math.max(right, end);
+      }
     } else if (item.str !== "") {
       parts.push(" ");
     }
@@ -90,11 +113,11 @@ function linesOf(items: PageTextItem[]): Line[] {
   }
   flush();
 
-  return lines.sort((a, b) => b.y - a.y);
+  return inOrder ? lines : lines.sort((a, b) => b.y - a.y);
 }
 
-/** The size most of the page's characters are set in. */
-function bodySize(lines: Line[]): number {
+/** The size most of the characters are set in. */
+export function bodySize(lines: Line[]): number {
   const weight = new Map<number, number>();
   for (const line of lines) {
     const size = Math.round(line.fontSize * 2) / 2;

@@ -2,7 +2,8 @@ import "server-only";
 import { basename, extname } from "node:path";
 import { acceptUpload } from "@/server/uploads/accept";
 import { asDate, asText, parseFrontmatter } from "@/server/kb/frontmatter";
-import { titleFromFirstPage, titleFromPdfInfo } from "@/server/kb/pdf-title";
+import { pdfPagesToMarkdown } from "@/server/kb/pdf-markdown";
+import { titleFromFirstPage, titleFromPdfInfo, type PageTextItem } from "@/server/kb/pdf-title";
 import type { PDFDocumentProxy } from "unpdf/pdfjs";
 
 /**
@@ -165,32 +166,37 @@ function bare(path: string, sourceType: SourceType): ExtractedArticle {
   };
 }
 
+/** A page's text items, with the size each is set in and where it sits. */
+async function pageItems(pdf: PDFDocumentProxy, pageNumber: number): Promise<PageTextItem[]> {
+  const content = await (await pdf.getPage(pageNumber)).getTextContent();
+  return content.items.flatMap((item) =>
+    "str" in item
+      ? [
+          {
+            str: item.str,
+            y: item.transform[5] as number,
+            fontSize: Math.hypot(item.transform[2] as number, item.transform[3] as number),
+            hasEOL: item.hasEOL,
+            x: item.transform[4] as number,
+            width: item.width,
+          },
+        ]
+      : [],
+  );
+}
+
 /**
  * A PDF's title, best first: the largest text on its first page, as a reader
  * sees it; then the Title the author set, when it isn't a placeholder; and the
  * file name only when neither says anything.
  */
-async function pdfTitle(pdf: PDFDocumentProxy, path: string): Promise<string | null> {
-  try {
-    const content = await (await pdf.getPage(1)).getTextContent();
-    const items = content.items.flatMap((item) =>
-      "str" in item
-        ? [
-            {
-              str: item.str,
-              y: item.transform[5] as number,
-              fontSize: Math.hypot(item.transform[2] as number, item.transform[3] as number),
-              hasEOL: item.hasEOL,
-            },
-          ]
-        : [],
-    );
-    const heading = titleFromFirstPage(items);
-    if (heading) return heading;
-  } catch {
-    // A first page that can't be read still leaves the Title property.
-  }
-
+async function pdfTitle(
+  pdf: PDFDocumentProxy,
+  firstPage: PageTextItem[],
+  path: string,
+): Promise<string | null> {
+  const heading = titleFromFirstPage(firstPage);
+  if (heading) return heading;
   try {
     const { info } = await pdf.getMetadata();
     return titleFromPdfInfo(info as Record<string, unknown>, path);
@@ -200,26 +206,38 @@ async function pdfTitle(pdf: PDFDocumentProxy, path: string): Promise<string | n
 }
 
 async function fromPdf(path: string, bytes: Buffer): Promise<ExtractedArticle> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
+  const { getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(bytes));
-  const title = await pdfTitle(pdf, path);
-  const { totalPages, text } = await extractText(pdf, { mergePages: false });
+  const totalPages = pdf.numPages;
 
-  const pages = text.map((page) => page.trim());
-  const characters = pages.reduce((sum, page) => sum + page.replace(/\s/g, "").length, 0);
+  // Each page is read once: its text for the scan check and the body, and the
+  // size of each piece for the title and the headings.
+  const pages: PageTextItem[][] = [];
+  for (let page = 1; page <= totalPages; page += 1) {
+    try {
+      pages.push(await pageItems(pdf, page));
+    } catch {
+      pages.push([]);
+    }
+  }
+
+  const characters = pages.reduce(
+    (sum, items) => sum + items.reduce((n, item) => n + item.str.replace(/\s/g, "").length, 0),
+    0,
+  );
   const article = bare(path, "pdf");
-  article.title = title ?? article.title;
-  article.format = "text";
+  article.title = (await pdfTitle(pdf, pages[0] ?? [], path)) ?? article.title;
   article.metadata = { pages: totalPages };
 
   // Only the text layer is read. A scan has none, and saying so is more use
   // than failing the import or storing an empty article as if it were whole.
   if (characters < MIN_CHARS_PER_PAGE * Math.max(1, totalPages)) {
+    article.format = "text";
     article.extraction = "unextracted";
     return article;
   }
 
-  article.body = pages.filter((page) => page !== "").join("\n\n");
+  article.body = pdfPagesToMarkdown(pages);
   return article;
 }
 
