@@ -2,6 +2,8 @@ import "server-only";
 import { basename, extname } from "node:path";
 import { acceptUpload } from "@/server/uploads/accept";
 import { asDate, asText, parseFrontmatter } from "@/server/kb/frontmatter";
+import { titleFromFirstPage, titleFromPdfInfo } from "@/server/kb/pdf-title";
+import type { PDFDocumentProxy } from "unpdf/pdfjs";
 
 /**
  * Turns one file into an article. What the file is comes from its own bytes,
@@ -163,14 +165,50 @@ function bare(path: string, sourceType: SourceType): ExtractedArticle {
   };
 }
 
+/**
+ * A PDF's title, best first: the largest text on its first page, as a reader
+ * sees it; then the Title the author set, when it isn't a placeholder; and the
+ * file name only when neither says anything.
+ */
+async function pdfTitle(pdf: PDFDocumentProxy, path: string): Promise<string | null> {
+  try {
+    const content = await (await pdf.getPage(1)).getTextContent();
+    const items = content.items.flatMap((item) =>
+      "str" in item
+        ? [
+            {
+              str: item.str,
+              y: item.transform[5] as number,
+              fontSize: Math.hypot(item.transform[2] as number, item.transform[3] as number),
+              hasEOL: item.hasEOL,
+            },
+          ]
+        : [],
+    );
+    const heading = titleFromFirstPage(items);
+    if (heading) return heading;
+  } catch {
+    // A first page that can't be read still leaves the Title property.
+  }
+
+  try {
+    const { info } = await pdf.getMetadata();
+    return titleFromPdfInfo(info as Record<string, unknown>, path);
+  } catch {
+    return null;
+  }
+}
+
 async function fromPdf(path: string, bytes: Buffer): Promise<ExtractedArticle> {
   const { extractText, getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(bytes));
+  const title = await pdfTitle(pdf, path);
   const { totalPages, text } = await extractText(pdf, { mergePages: false });
 
   const pages = text.map((page) => page.trim());
   const characters = pages.reduce((sum, page) => sum + page.replace(/\s/g, "").length, 0);
   const article = bare(path, "pdf");
+  article.title = title ?? article.title;
   article.format = "text";
   article.metadata = { pages: totalPages };
 
