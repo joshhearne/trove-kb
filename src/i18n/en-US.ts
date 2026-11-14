@@ -1204,8 +1204,10 @@ export const enUS = {
       searchIcons: "Search icons",
       noIcon: "No icon",
       noIconMatches: (query: string) => `Nothing matches “${query}”.`,
-      iconsShown: (shown: number, total: number) =>
-        shown === total ? `${total} icons` : `${shown} of ${total} icons; search to narrow`,
+      iconsShown: (shown: number, total: number) => {
+        const noun = total === 1 ? "icon" : "icons";
+        return shown === total ? `${total} ${noun}` : `${shown} of ${total} ${noun}; search to narrow`;
+      },
       loadingIcons: "Loading icons…",
       templateFields: "Template fields",
       noFields: "No fields yet.",
