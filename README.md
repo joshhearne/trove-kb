@@ -54,9 +54,13 @@ administrator picks a channel:
 
 - **Production**: installs each new release (a `vX.Y.Z` tag on `main`) at the
   update hour.
-- **Development**: installs the newest build of the `dev` branch each night.
-  For test and staging servers.
+- **Development**: installs the newest build of the `dev` branch at the update
+  hour. For test and staging servers.
 - **Manual** (the default): never updates on its own.
+
+The update hour is set on the same page, in the server's local time (03:00 by
+default). On Production or Development, **Update now** installs the newest
+build within ten minutes instead of waiting for the hour.
 
 The same page shows the build that is running, what is available, what the
 host said on its last check, an **Update now** button, the changes the next
@@ -486,7 +490,7 @@ The single sign-on test runs a mock identity provider published on host port
 
 - **`dev`** is where work lands: pull requests go into `dev`. Every push to it
   publishes `ghcr.io/joshhearne/trove-kb:dev-<sha7>` (and `:dev`), which
-  Development-channel servers install that night.
+  Development-channel servers install at their update hour.
 - **`main`** is the newest release. A release is a `vX.Y.Z` tag on a tested
   `dev` commit; the tag publishes `:vX.Y.Z` and moves `:stable`, which
   Production-channel servers install at their update hour, and `main` moves
