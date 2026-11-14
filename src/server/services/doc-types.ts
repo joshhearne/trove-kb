@@ -8,6 +8,12 @@ import { docTypes, documents, fields } from "@/server/db/schema";
 import { writeAudit } from "@/server/services/audit";
 import { NotFoundError } from "@/server/services/companies";
 import {
+  FIELD_DEFINITION_COLUMNS,
+  convertStoredValues,
+  needsConversion,
+  type ConversionSummary,
+} from "@/server/services/field-conversion";
+import {
   EDITABLE_FIELD_TYPES,
   usesLinkDocType,
   usesMacFormat,
@@ -269,14 +275,31 @@ export async function addTemplateField(
   });
 }
 
+/**
+ * Saves a template field. When the type, option list or MAC format changes,
+ * every stored value is converted in the same transaction (see
+ * convertStoredValues); the summary says how many converted and how many were
+ * kept as they were because they don't fit the new type.
+ */
 export async function updateTemplateField(
   id: string,
   input: z.input<typeof templateFieldInputSchema>,
   actorId: string,
-): Promise<void> {
+): Promise<ConversionSummary> {
   const data = templateFieldInputSchema.parse(input);
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select({
+        fieldType: fields.fieldType,
+        optionListId: fields.optionListId,
+        macFormat: fields.macFormat,
+      })
+      .from(fields)
+      .where(eq(fields.id, id))
+      .limit(1);
+    if (!before) throw new NotFoundError("Field");
+
     const [updated] = await tx
       .update(fields)
       .set({
@@ -288,8 +311,11 @@ export async function updateTemplateField(
         required: data.required,
       })
       .where(eq(fields.id, id))
-      .returning({ id: fields.id });
+      .returning(FIELD_DEFINITION_COLUMNS);
     if (!updated) throw new NotFoundError("Field");
+
+    const after = updated as FieldDefinition;
+    const conversion = await convertStoredValues(tx, before, after);
 
     await writeAudit(
       {
@@ -297,10 +323,17 @@ export async function updateTemplateField(
         action: "field.updated",
         entity: "field",
         entityId: id,
-        detail: { label: data.label, fieldType: data.fieldType },
+        detail: {
+          label: data.label,
+          fieldType: data.fieldType,
+          ...(needsConversion(before, after)
+            ? { previousFieldType: before.fieldType, conversion }
+            : {}),
+        },
       },
       tx,
     );
+    return conversion;
   });
 }
 

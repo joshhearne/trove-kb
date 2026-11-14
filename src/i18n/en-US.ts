@@ -1214,6 +1214,19 @@ export const enUS = {
       addField: "Add a template field",
       addFieldSubmit: "Add field",
       saveField: "Save field",
+      typeChangeHint:
+        "Changing the type converts each document's value where it fits the new type. A value that doesn't fit is kept as it was.",
+      valuesConverted: (converted: number, kept: number) => {
+        const done =
+          converted === 0 ? "" : converted === 1 ? "Converted 1 value. " : `Converted ${converted} values. `;
+        const left =
+          kept === 0
+            ? ""
+            : kept === 1
+              ? "1 value doesn't fit the new type and was kept as it was; edit that document to fix it."
+              : `${kept} values don't fit the new type and were kept as they were; edit those documents to fix them.`;
+        return (done + left).trim();
+      },
       archivedFields: "Archived fields",
       archivedFieldsNote:
         "Archived fields stay hidden but their stored values are kept, so old revisions still render.",

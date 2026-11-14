@@ -7,6 +7,7 @@ import { documents, fields } from "@/server/db/schema";
 import { writeAudit } from "@/server/services/audit";
 import { queueEvent } from "@/server/services/webhooks";
 import { NotFoundError } from "@/server/services/companies";
+import { convertStoredValues, needsConversion } from "@/server/services/field-conversion";
 import { assertDocumentInScope } from "@/server/services/documents";
 import { assertInScope, type CompanyScope } from "@/server/auth/company-scope";
 import {
@@ -141,7 +142,13 @@ export async function promoteField(
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: fields.id, documentId: fields.documentId })
+      .select({
+        id: fields.id,
+        documentId: fields.documentId,
+        fieldType: fields.fieldType,
+        optionListId: fields.optionListId,
+        macFormat: fields.macFormat,
+      })
       .from(fields)
       .where(eq(fields.id, fieldId))
       .limit(1);
@@ -177,6 +184,9 @@ export async function promoteField(
       .returning(FIELD_COLUMNS);
     if (!promoted) throw new Error("Failed to promote field");
 
+    // The promote form can change the type; bring this document's value along.
+    const conversion = await convertStoredValues(tx, existing, promoted as FieldDefinition);
+
     await writeAudit(
       {
         userId: actorId,
@@ -187,6 +197,7 @@ export async function promoteField(
           docTypeId: document.docTypeId,
           fromDocumentId: existing.documentId,
           label: data.label,
+          ...(needsConversion(existing, promoted as FieldDefinition) ? { conversion } : {}),
         },
       },
       tx,
