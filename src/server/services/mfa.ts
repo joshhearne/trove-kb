@@ -1,4 +1,5 @@
 import "server-only";
+import { clearSecondStep } from "@/server/services/mfa-reset";
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import {
   generateAuthenticationOptions,
@@ -567,23 +568,16 @@ export async function verifyPasskeyStep(
 /**
  * Everything a person enrolled, gone, so they can start again: for a lost
  * phone and a lost key together. Their sessions are no longer verified and
- * their grace period starts afresh. Done from the interface and logged, never
+ * their grace period starts afresh. Done from the interface and logged, or by
+ * a sole administrator from the server console (scripts/reset-mfa.ts), never
  * by hand in the database.
  */
 export async function resetMfa(userId: string, actorId: string): Promise<void> {
   await db.transaction(async (tx) => {
-    const [row] = await tx.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
-    if (!row) throw new NotFoundError("User");
-    await tx.delete(mfaTotp).where(eq(mfaTotp.userId, userId));
-    await tx.delete(mfaPasskeys).where(eq(mfaPasskeys.userId, userId));
-    await tx.delete(mfaRecoveryCodes).where(eq(mfaRecoveryCodes.userId, userId));
-    await tx
-      .update(users)
-      .set({ mfaFailures: 0, mfaLockedUntil: null, mfaDeadline: null })
-      .where(eq(users.id, userId));
-    await tx.update(sessions).set({ mfaVerifiedAt: null }).where(eq(sessions.userId, userId));
+    const cleared = await clearSecondStep(tx, userId);
+    if (!cleared) throw new NotFoundError("User");
     await writeAudit(
-      { userId: actorId, action: "mfa.reset", entity: "user", entityId: userId, detail: { email: row.email } },
+      { userId: actorId, action: "mfa.reset", entity: "user", entityId: userId, detail: { email: cleared.email } },
       tx,
     );
   });

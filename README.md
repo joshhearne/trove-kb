@@ -450,6 +450,18 @@ for the step again after fifteen minutes. An administrator who has lost
 everything is put right by another administrator from Admin → Users, and it is
 all in the audit log.
 
+A sole administrator who has lost every factor resets their own from the
+server console, which does what the Admin → Users button does and is audited
+the same way:
+
+```bash
+docker compose exec app node dist/reset-mfa.js admin@example.com
+# bare metal, from the checkout:
+cd current && node --env-file=../.env dist/reset-mfa.js admin@example.com
+```
+
+They sign in with their password and enroll again within a week.
+
 ## Single sign-on
 
 Set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` (all three or

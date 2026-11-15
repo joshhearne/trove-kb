@@ -728,7 +728,11 @@ sign-on in front of it, or Cloudflare Access, is not a substitute.
   `mfa_locked_until`); every wrong answer is an audit entry.
 - **Recovery**: an administrator resets somebody's second step from the users
   page, which removes everything enrolled, unstamps their sessions, and
-  starts their week again, audited. Nothing is done by hand in the database.
+  starts their week again, audited. A sole administrator does the same from
+  the server console (`scripts/reset-mfa.ts`, bundled as `dist/reset-mfa.js`);
+  its audit entry has no actor and `via: "console"`. Both share
+  `clearSecondStep` (`src/server/services/mfa-reset.ts`). Nothing is done by
+  hand in the database.
 - **API keys** are not accounts and have no second step; they are scoped,
   rotated, and revoked instead.
 
