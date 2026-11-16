@@ -1,0 +1,46 @@
+# Dependabot version updates. PRs go into dev, like all other work; main is
+# released code only. Minor and patch bumps are grouped into one PR per
+# ecosystem; major bumps arrive one per PR so each can be reviewed alone.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+
+  # node:22-alpine in both images. Node majors are a deliberate upgrade,
+  # not a weekly bump, so only minor/patch digests are proposed.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /docker/bw-serve
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+    commit-message:
+      prefix: "deps(docker)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps(actions)"
