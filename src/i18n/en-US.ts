@@ -793,6 +793,22 @@ export const enUS = {
         "This article was brought in from a file or a website. Changes made here are kept until the next import of the same article replaces them.",
       importedTextNote:
         "This article came from a text file in an import. Saving keeps your changes: later imports of the same file leave it alone, and the earlier text stays in its history.",
+
+      upload: "Upload",
+      uploadTitle: "Upload a document instead of writing the body",
+      writeInstead: "Write instead",
+      file: "Document",
+      fileHint: (maxMb: number) =>
+        `A PDF, Word document (.docx), HTML page, Markdown, or text file, up to ${maxMb} MB. Its text becomes the article, and the file is kept beside it for anyone who wants the original.`,
+      chooseFile: "Choose a file…",
+      changeFile: "Choose another…",
+      noFile: "No file chosen.",
+      chosenFile: (name: string, size: string) => `${name} (${size})`,
+      titleFromFile: "Leave blank to take the title from the document",
+      uploadSave: "Upload and save",
+      uploadingFile: "Uploading…",
+      uploadTooLarge: (maxMb: number) => `That file is larger than ${maxMb} MB.`,
+      uploadFailed: "The upload did not go through. Try again.",
     },
     manage: {
       title: "Manage this article",
