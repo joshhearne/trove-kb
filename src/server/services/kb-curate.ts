@@ -21,10 +21,12 @@ import {
   keepOriginal,
   originalOf,
   rewriteChunks,
+  sourceKey,
+  storeArticle,
 } from "@/server/services/kb-import";
 import { recordRevision } from "@/server/services/kb-revisions";
 import { extractArticle, NotAnArticleError } from "@/server/kb/extract";
-import { deriveRunbook } from "@/server/kb/runbook";
+import { deriveRunbook, RunbookStepError } from "@/server/kb/runbook";
 import { tidyImportedMarkdown } from "@/server/kb/tidy";
 
 /**
@@ -397,4 +399,120 @@ export async function replaceArticleFile(
       tx,
     );
   });
+}
+
+export const uploadArticleSchema = z.object({
+  collectionId: z.uuid(),
+  /** Left blank, the title is read from the file. */
+  title: z
+    .string()
+    .trim()
+    .max(500)
+    .transform((value) => (value === "" ? null : value))
+    .nullable()
+    .optional(),
+  category: name,
+  subcategory: name,
+  kind: z.enum(["article", "runbook"]).default("article"),
+  publicHidden: z.boolean().default(false),
+});
+
+const NOT_ACCEPTED =
+  "That file is not one the knowledge base takes: use a PDF, a Word document (.docx), HTML, Markdown, or text.";
+
+/**
+ * A new article made from one file, chosen on the new-article page instead
+ * of typing the body: read as an import reads it, with the file kept beside
+ * it, and filed where the person said. It is written under a key of its own,
+ * so no import of the collection ever matches it.
+ */
+export async function uploadArticle(
+  input: z.input<typeof uploadArticleSchema>,
+  filename: string,
+  bytes: Buffer,
+  writer: KbWriter,
+): Promise<string> {
+  const data = uploadArticleSchema.parse(input);
+  const collection = await getCollection(data.collectionId, readerFor(writer));
+  if (!collection) throw new NotFoundError("Collection");
+  if (!mayWrite(writer, collection.id)) {
+    throw new ForbiddenError(`You may read "${collection.name}" but not change it.`);
+  }
+
+  // Only the last part of the name the browser gave, and nothing that reads as a path.
+  const safeName =
+    filename
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/[\u0000-\u001f]/g, "")
+      .trim()
+      .slice(0, 200) || "document";
+
+  let extracted;
+  try {
+    extracted = await extractArticle(safeName, bytes);
+  } catch (error) {
+    throw new NotAcceptedFileError(error instanceof NotAnArticleError ? NOT_ACCEPTED : "That file could not be read.");
+  }
+
+  const body = clean(extracted.format === "markdown" ? tidyImportedMarkdown(extracted.body) : extracted.body);
+  if (data.kind === "runbook") {
+    if (extracted.format !== "markdown") {
+      throw new RunbookStepError("A plain text file has no numbered list to take steps from. Leave “runbook” unticked.");
+    }
+    // Refused before anything is stored, rather than after the file is kept.
+    deriveRunbook(body, []);
+  }
+
+  const contentHash = createHash("sha256").update(bytes).digest("hex");
+  const path = `uploads/${crypto.randomUUID()}/${safeName}`;
+  const original = await keepOriginal(collection.id, safeName, bytes, extracted.sourceType, contentHash);
+  const now = new Date();
+
+  const articleId = await storeArticle(
+    collection.id,
+    sourceKey(null, path),
+    path,
+    {
+      ...extracted,
+      title: data.title ?? extracted.title,
+      body,
+      externalId: null,
+      category: data.category ?? null,
+      subcategory: data.subcategory ?? null,
+      kind: data.kind,
+      publicHidden: data.publicHidden,
+      dateCreated: extracted.dateCreated ?? now,
+      dateModified: now,
+      metadata: {
+        ...extracted.metadata,
+        ...(original ? { original } : {}),
+        uploaded_by: writer.via === "app" ? writer.userName : writer.keyName,
+      },
+    },
+    contentHash,
+    { writerPlaces: true },
+  );
+
+  await writeAudit({
+    action: "kb_article.created",
+    entity: "kb_article",
+    entityId: articleId,
+    detail: {
+      collectionId: collection.id,
+      title: data.title ?? extracted.title,
+      file: safeName,
+      bytes: bytes.byteLength,
+      publicHidden: data.publicHidden,
+      ...attribution(writer),
+    },
+  });
+  await queueEvent("kb.article.upserted", {
+    collection_id: collection.id,
+    article_id: articleId,
+    external_id: null,
+    kind: data.kind,
+  });
+
+  return articleId;
 }

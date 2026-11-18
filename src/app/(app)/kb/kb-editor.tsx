@@ -2,17 +2,24 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useActionState, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useId, useMemo, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { FileUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FormError } from "@/components/ui/alert";
-import { useMessages } from "@/i18n/client";
+import { useLocale, useMessages } from "@/i18n/client";
+import { formatBytes } from "@/i18n/format";
 import type { FormState } from "@/lib/form";
 import { deriveRunbook, RunbookStepError, type RunbookStep } from "@/server/kb/runbook";
 import { collectionCategoriesAction, saveArticleAction, unlockMoveAction } from "./actions";
+
+/** What the upload takes, as the importer reads it. */
+const UPLOAD_ACCEPT =
+  ".pdf,.docx,.html,.htm,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain";
 
 export type Category = { category: string | null; subcategory: string | null };
 
@@ -121,6 +128,9 @@ function ComboField({
  * collection already uses, and for a runbook the steps as a save would keep
  * them, read from the body as it is typed. An administrator can move the
  * article to another collection from here, with the second step fresh.
+ *
+ * A new article can be uploaded instead of written: the same title, place
+ * and settings, with one document in place of the body.
  */
 export function KbEditor({
   values,
@@ -131,6 +141,8 @@ export function KbEditor({
   canMove,
   moveUnlocked,
   textOnly = false,
+  header,
+  maxUploadMb,
 }: {
   values: EditorValues;
   backHref: string;
@@ -145,9 +157,22 @@ export function KbEditor({
   textOnly?: boolean;
   /** The second step is fresh, so the move dialog opens. */
   moveUnlocked: boolean;
+  /** The page's heading, with the Upload button beside it. */
+  header?: ReactNode;
+  /** Offers uploading a document instead of writing, for a new article. */
+  maxUploadMb?: number;
 }) {
   const messages = useMessages();
+  const locale = useLocale();
+  const router = useRouter();
   const t = messages.kb.editor;
+  const canUpload = maxUploadMb !== undefined && values.articleId === undefined;
+  const [uploadMode, setUploadMode] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const fileId = useId();
   const ids = { title: useId(), category: useId(), subcategory: useId(), body: useId(), collection: useId() };
   const [body, setBody] = useState(values.body);
   const [runbook, setRunbook] = useState(values.kind === "runbook");
@@ -178,13 +203,13 @@ export function KbEditor({
   );
 
   const preview = useMemo(() => {
-    if (!runbook) return null;
+    if (!runbook || uploadMode) return null;
     try {
       return { steps: deriveRunbook(body, values.steps).steps, error: null };
     } catch (error) {
       return { steps: [], error: error instanceof RunbookStepError ? error.message : String(error) };
     }
-  }, [runbook, body, values.steps]);
+  }, [runbook, uploadMode, body, values.steps]);
 
   const targetName = collections.find((row) => row.id === collectionId)?.name ?? collectionName;
   const moving = values.articleId !== undefined && collectionId !== values.collectionId;
@@ -203,8 +228,78 @@ export function KbEditor({
     });
   };
 
-  return (
-    <form action={formAction} className="flex max-w-4xl flex-col gap-5">
+  function chooseFile(list: FileList | null) {
+    const next = list?.[0] ?? null;
+    setUploadError(
+      next && maxUploadMb !== undefined && next.size > maxUploadMb * 1024 * 1024 ? t.uploadTooLarge(maxUploadMb) : null,
+    );
+    setFile(next);
+  }
+
+  // The file goes up with the rest of the form; the article opens once it is in.
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!file) {
+      setUploadError(t.noFile);
+      return;
+    }
+    if (maxUploadMb !== undefined && file.size > maxUploadMb * 1024 * 1024) {
+      setUploadError(t.uploadTooLarge(maxUploadMb));
+      return;
+    }
+    const data = new FormData(event.currentTarget);
+    data.delete("body");
+    data.set("file", file);
+    setSending(true);
+    setUploadError(null);
+    try {
+      const response = await fetch("/api/kb/articles", { method: "POST", body: data });
+      const result = (await response.json().catch(() => null)) as {
+        id?: string;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !result?.id) {
+        setUploadError(result?.error?.message ?? t.uploadFailed);
+        setSending(false);
+        return;
+      }
+      router.push(`/kb/articles/${result.id}` as Route);
+      router.refresh();
+    } catch {
+      setUploadError(t.uploadFailed);
+      setSending(false);
+    }
+  }
+
+  const uploadToggle = canUpload ? (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => {
+        setUploadMode((on) => !on);
+        setUploadError(null);
+      }}
+      aria-pressed={uploadMode}
+      title={uploadMode ? undefined : t.uploadTitle}
+      disabled={sending}
+    >
+      {uploadMode ? (
+        t.writeInstead
+      ) : (
+        <>
+          {t.upload}
+          <Plus className="size-4" aria-hidden />
+        </>
+      )}
+    </Button>
+  ) : null;
+
+  const form = (
+    <form
+      action={uploadMode ? undefined : formAction}
+      onSubmit={uploadMode ? (event) => void upload(event) : undefined}
+      className="flex max-w-4xl flex-col gap-5"
+    >
       <input type="hidden" name="collectionId" value={collectionId} />
       {values.articleId && <input type="hidden" name="articleId" value={values.articleId} />}
       {values.articleId && <input type="hidden" name="fromCollectionId" value={values.collectionId} />}
@@ -241,8 +336,17 @@ export function KbEditor({
         </div>
       )}
 
+      {!header && uploadToggle && <div className="flex justify-end">{uploadToggle}</div>}
+
       <Field id={ids.title} label={t.title} error={state.fieldErrors?.title}>
-        <Input id={ids.title} name="title" defaultValue={values.title} required maxLength={500} />
+        <Input
+          id={ids.title}
+          name="title"
+          defaultValue={values.title}
+          required={!uploadMode}
+          placeholder={uploadMode ? t.titleFromFile : undefined}
+          maxLength={500}
+        />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -302,6 +406,27 @@ export function KbEditor({
       </>
       )}
 
+      {uploadMode ? (
+        <Field id={fileId} label={t.file} hint={t.fileHint(maxUploadMb ?? 0)}>
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-dashed px-4 py-6">
+            <input
+              ref={fileInput}
+              id={fileId}
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              className="sr-only"
+              onChange={(event) => chooseFile(event.target.files)}
+            />
+            <Button type="button" variant="outline" disabled={sending} onClick={() => fileInput.current?.click()}>
+              <FileUp className="size-4" aria-hidden />
+              {file ? t.changeFile : t.chooseFile}
+            </Button>
+            <span className="min-w-0 break-words text-sm text-[var(--muted-foreground)]">
+              {file ? t.chosenFile(file.name, formatBytes(file.size, locale)) : t.noFile}
+            </span>
+          </div>
+        </Field>
+      ) : (
       <Field id={ids.body} label={t.body} hint={t.bodyHint} error={state.fieldErrors?.body ?? preview?.error ?? undefined}>
         <Textarea
           id={ids.body}
@@ -313,6 +438,7 @@ export function KbEditor({
           aria-invalid={!!state.fieldErrors?.body || !!preview?.error}
         />
       </Field>
+      )}
 
       {preview && (
         <section aria-label={t.stepsPreview} className="rounded-md border px-4 py-3">
@@ -341,11 +467,20 @@ export function KbEditor({
         </section>
       )}
 
-      <FormError>{state.error}</FormError>
+      <FormError>{uploadMode ? uploadError : state.error}</FormError>
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending || loading || !!preview?.error}>
-          {t.save}
-        </Button>
+        {uploadMode ? (
+          <Button
+            type="submit"
+            disabled={sending || !file || (maxUploadMb !== undefined && file.size > maxUploadMb * 1024 * 1024)}
+          >
+            {sending ? t.uploadingFile : t.uploadSave}
+          </Button>
+        ) : (
+          <Button type="submit" disabled={pending || loading || !!preview?.error}>
+            {t.save}
+          </Button>
+        )}
         <Link href={backHref as Route} className="text-sm underline">
           {t.cancel}
         </Link>
@@ -386,5 +521,16 @@ export function KbEditor({
         </div>
       </dialog>
     </form>
+  );
+
+  if (!header) return form;
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex max-w-4xl flex-wrap items-end justify-between gap-3">
+        <div>{header}</div>
+        {uploadToggle}
+      </div>
+      {form}
+    </div>
   );
 }

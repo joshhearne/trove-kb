@@ -3,6 +3,7 @@ import { requireScopedUser } from "@/server/auth/session";
 import { getCollection, listCategories } from "@/server/services/kb";
 import { userMayWrite } from "@/server/services/kb-write";
 import { getI18n } from "@/i18n/server";
+import { MAX_ENTRY_BYTES } from "@/server/kb/zip";
 import { KbEditor } from "../../kb-editor";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +22,14 @@ export default async function NewArticlePage({
   const [categories, { messages: t }] = await Promise.all([listCategories(collection.id, reader), getI18n()]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-[var(--muted-foreground)]">{collection.name}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.kb.editor.newTitle}</h1>
-      </div>
-      <KbEditor
+    <KbEditor
+        header={
+          <>
+            <p className="text-sm text-[var(--muted-foreground)]">{collection.name}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{t.kb.editor.newTitle}</h1>
+          </>
+        }
+        maxUploadMb={Math.floor(MAX_ENTRY_BYTES / (1024 * 1024))}
         backHref={`/kb/${collection.id}`}
         categories={categories.map((row) => ({ category: row.category, subcategory: row.subcategory }))}
         collections={[]}
@@ -45,6 +48,5 @@ export default async function NewArticlePage({
           imported: false,
         }}
       />
-    </div>
   );
 }

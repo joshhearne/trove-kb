@@ -42,3 +42,19 @@ export async function requireAdminRequest(
 
   return { user };
 }
+
+/**
+ * The same guard for a route anyone signed in may call, such as writing an
+ * article where they hold a grant: whether they may is the service's to say.
+ */
+export async function requireUserRequest(
+  request: Request,
+): Promise<{ user: CurrentUser } | { response: Response }> {
+  if (request.method !== "GET" && !sameOrigin(request)) {
+    return { response: refuse(403, "forbidden", "Origin not allowed") };
+  }
+
+  const user = await getCurrentUser();
+  if (!user) return { response: refuse(401, "unauthorized", "Sign in first") };
+  return { user };
+}
