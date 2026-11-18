@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
     ],
   },
   typedRoutes: true,
+  // `next dev` otherwise appends its own agent block to CLAUDE.md whenever an
+  // AI coding agent runs it, leaving a change nobody made in every checkout.
+  agentRules: false,
 };
 
 export default nextConfig;
