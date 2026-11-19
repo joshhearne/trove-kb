@@ -508,6 +508,21 @@ appears in the documentation search.
   the point and its text alone does not show it. A document imported before
   this whose file was not kept is taken in again on the next import of the
   same file, hash unchanged or not.
+- **Export** (`src/server/services/kb-export.ts`) gives a reader an article as
+  a file, at `/api/kb/articles/:id/export?format=` and on the public site at
+  `/pub/kb/articles/:id/export?format=`: `pdf`, `md`, or `original` (the kept
+  file when it is not a PDF). The article's own format is offered first: PDF
+  when it came from one, Markdown otherwise. A PDF is the kept one with a
+  footer stamped on each page, or one laid out from the Markdown with pdf-lib
+  in the standard fonts (`src/server/kb/export-pdf.ts`); only the collection's
+  own pictures are embedded, and no other address is fetched. Every PDF page
+  carries a footer, and every Markdown file a front matter block, naming the
+  article's address (the public site's when it is there), its category and
+  section, its source, and when it was exported. The front matter uses keys an
+  import reads (`title`, `category`, `section`, `kind`, `source_url`), so an
+  exported file can be brought back in. Read through the reader's `KbReader`,
+  so the public site exports only what it shows; public exports are
+  rate-limited apart from pages and pictures.
   Public pages only: no credentials, no cookies, `robots.txt` honoured, a pause
   between requests, a page cap per run. **Every address is user input or
   written by a stranger**, so each request and each redirect resolves first,

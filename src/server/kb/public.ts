@@ -64,6 +64,8 @@ const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 120;
 /** A page of photographs asks for each of them, so pictures are counted apart. */
 const MAX_IMAGE_REQUESTS = 1_200;
+/** An export makes a whole file, so far fewer are allowed. */
+const MAX_EXPORT_REQUESTS = 20;
 const windows = new Map<string, { count: number; resetAt: number }>();
 
 function withinLimit(address: string, most = MAX_REQUESTS): boolean {
@@ -168,6 +170,26 @@ export async function admitPublicImageReader(): Promise<KbReader | null> {
     return null;
 
   if (!withinLimit(`image:${address ?? "unknown"}`, MAX_IMAGE_REQUESTS)) {
+    throw new TooManyRequestsError();
+  }
+  return publicReader();
+}
+
+/**
+ * The same gate for an export, which is a download and cannot be answered
+ * with a page either, and which costs far more than a page: counted apart,
+ * with a much lower limit. Null is "not found".
+ */
+export async function admitPublicExportReader(): Promise<KbReader | null> {
+  const settings = await getKbPublicSettings();
+  if (settings.mode === "off") return null;
+  if (!(await onPublishedHost(settings))) return null;
+
+  const address = await visitorAddress();
+  if (settings.mode === "addresses" && !isListed(address, settings.addresses))
+    return null;
+
+  if (!withinLimit(`export:${address ?? "unknown"}`, MAX_EXPORT_REQUESTS)) {
     throw new TooManyRequestsError();
   }
   return publicReader();

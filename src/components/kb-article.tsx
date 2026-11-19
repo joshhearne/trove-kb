@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ChevronLeft, ExternalLink, FileText, ListChecks } from "lucide-react";
+import { ChevronDown, ChevronLeft, Download, ExternalLink, FileText, ListChecks } from "lucide-react";
 import { Chip } from "@/components/ui/chip";
 import { RunbookRun, RunbookSteps, type RenderedStep } from "@/components/kb-runbook-steps";
 import { deriveRunbook, type RunbookStep } from "@/server/kb/runbook";
@@ -10,6 +10,7 @@ import { embedVideos } from "@/server/kb/video";
 import { KbOutline } from "@/components/kb-outline";
 import type { ArticleDetail } from "@/server/services/kb";
 import { originalOf } from "@/server/services/kb-import";
+import { exportOptions, type ExportFormat } from "@/server/kb/export";
 import { formatBytes, formatDateTime } from "@/i18n/format";
 import type { Messages } from "@/i18n";
 import type { Locale } from "@/i18n/locales";
@@ -43,6 +44,62 @@ function withoutLeadingTitle(body: string, title: string): string {
 }
 
 /**
+ * Export, in the article's own format first: a button for that one and a
+ * menu for the rest. Plain links in a disclosure, so it needs no script and
+ * works the same on the public site.
+ */
+function ExportMenu({
+  href,
+  original,
+  t,
+}: {
+  href: string;
+  original: { mime: string; name: string } | null;
+  t: Messages;
+}) {
+  const options = exportOptions(original);
+  const label = (format: ExportFormat) =>
+    format === "original" ? t.kb.export.original(options.originalName ?? "") : t.kb.export.as(t.kb.export[format]);
+  const link = (format: ExportFormat) => `${href}?format=${format}`;
+  const others = options.formats.filter((format) => format !== options.native);
+
+  return (
+    <div className="relative inline-flex items-stretch rounded-md border text-sm">
+      <a
+        href={link(options.native)}
+        download
+        className="inline-flex items-center gap-1.5 rounded-l-md px-3 py-1.5 hover:bg-[var(--muted)]"
+      >
+        <Download className="size-4 shrink-0" aria-hidden />
+        <span className="font-medium">{label(options.native)}</span>
+      </a>
+      <details className="border-l">
+        <summary
+          className="flex h-full cursor-pointer list-none items-center rounded-r-md px-2 hover:bg-[var(--muted)] [&::-webkit-details-marker]:hidden"
+          aria-label={t.kb.export.menu}
+          title={t.kb.export.menu}
+        >
+          <ChevronDown className="size-4" aria-hidden />
+        </summary>
+        <div className="absolute top-full left-0 z-20 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-md border bg-[var(--card)] p-1 shadow-lg">
+          {others.map((format) => (
+            <a
+              key={format}
+              href={link(format)}
+              download
+              className="rounded px-3 py-2 break-words hover:bg-[var(--muted)]"
+            >
+              {label(format)}
+            </a>
+          ))}
+          <p className="border-t px-3 py-2 text-xs text-[var(--muted-foreground)]">{t.kb.export.hint}</p>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/**
  * One article, as a signed-in reader and a visitor to the public site both
  * see it. What differs between them is where "back" goes and what sits beside
  * the title, which the page supplies.
@@ -51,6 +108,7 @@ export function KbArticle({
   article,
   backHref,
   originalHref,
+  exportHref,
   actions,
   locale,
   t,
@@ -59,6 +117,8 @@ export function KbArticle({
   backHref: string;
   /** Where the document the article was made from is served, when it was kept. */
   originalHref?: string;
+  /** Where the article is exported from; `?format=` is added. */
+  exportHref?: string;
   actions?: React.ReactNode;
   locale: Locale;
   t: Messages;
@@ -171,6 +231,7 @@ export function KbArticle({
                 </span>
               </a>
             )}
+            {exportHref && <ExportMenu href={exportHref} original={originalOf(article.metadata)} t={t} />}
             {actions}
           </div>
         </header>

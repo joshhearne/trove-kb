@@ -34,6 +34,7 @@ export default async function PublicArticlePage({
       article={article}
       backHref={`/pub/kb/${article.collectionId}`}
       originalHref={`/pub/kb/articles/${article.id}/original`}
+      exportHref={`/pub/kb/articles/${article.id}/export`}
       locale={locale}
       t={t}
       actions={
