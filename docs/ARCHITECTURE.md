@@ -514,7 +514,8 @@ appears in the documentation search.
   file when it is not a PDF). The article's own format is offered first: PDF
   when it came from one, Markdown otherwise. A PDF is the kept one with a
   footer stamped on each page, or one laid out from the Markdown with pdf-lib
-  in the standard fonts (`src/server/kb/export-pdf.ts`); only the collection's
+  in the standard fonts (`src/server/kb/export-pdf.ts`), with emoji drawn from
+  a bundled Noto Emoji subset (`src/server/kb/fonts`, see its README); only the collection's
   own pictures are embedded, and no other address is fetched. Every PDF page
   carries a footer, and every Markdown file a front matter block, naming the
   article's address (the public site's when it is there), its category and

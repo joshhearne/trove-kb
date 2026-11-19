@@ -1,6 +1,8 @@
 import "server-only";
 import { Lexer, type Token, type Tokens } from "marked";
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb, type RGB } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { isWorkers } from "@/lib/runtime";
 
 /**
  * A knowledge base article written out as a PDF, and the identifying footer
@@ -10,7 +12,10 @@ import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb, type RGB }
  * The layout is deliberately plain: headings, paragraphs, lists that keep
  * their numbers, code, quotes, tables and pictures, in the PDF standard
  * fonts. Those fonts cover Western European text; any other character is
- * written as its nearest plain letter, or "?".
+ * written as its nearest plain letter, or "?". Emoji and the icons help
+ * articles use in their text (⚠️, 🔧, ✅) are drawn from Noto Emoji
+ * (`src/server/kb/fonts`, SIL Open Font License), in one color, and only
+ * the glyphs a document uses are embedded in it.
  */
 
 /** What every page of an exported PDF says about where it came from. */
@@ -76,18 +81,64 @@ const SUBSTITUTES: Record<string, string> = {
   Ŀ: "L",
 };
 
+/**
+ * An emoji as a reader sees one: a pictograph with its presentation selector,
+ * skin tone and joined parts, a pair of flag letters, or a keycap.
+ */
+const EMOJI =
+  /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}{1,2}|[0-9#*]\uFE0F?\u20E3)(?:\uFE0F|\uFE0E|\p{Emoji_Modifier}|\u20E3|\u200D(?:\p{Extended_Pictographic}|\p{Regional_Indicator})\uFE0F?)*/gu;
+/** Joiners and selectors, which mean nothing without the emoji they belong to. */
+const EMOJI_PARTS = /[\uFE0E\uFE0F\u200D\u20E3]|\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}/u;
+
+/** Text and emoji apart. ©, ® and ™ are pictographs too, but stay text unless asked to be emoji. */
+export function splitEmoji(text: string): { text: string; emoji: boolean }[] {
+  const pieces: { text: string; emoji: boolean }[] = [];
+  let at = 0;
+  for (const match of text.matchAll(EMOJI)) {
+    const found = match[0];
+    if ([...found].length === 1 && drawable(found)) continue;
+    if (match.index > at) pieces.push({ text: text.slice(at, match.index), emoji: false });
+    pieces.push({ text: found, emoji: true });
+    at = match.index + found.length;
+  }
+  if (at < text.length) pieces.push({ text: text.slice(at), emoji: false });
+  return pieces;
+}
+
+let emojiFont: Promise<Uint8Array | null> | null = null;
+
+/** The emoji font's bytes, read once. None on Workers, which has no file system: emoji are left out there. */
+function emojiFontBytes(): Promise<Uint8Array | null> {
+  if (isWorkers()) return Promise.resolve(null);
+  emojiFont ??= (async () => {
+    try {
+      const [{ readFile }, { join }] = await Promise.all([import("node:fs/promises"), import("node:path")]);
+      return new Uint8Array(await readFile(join(process.cwd(), "src/server/kb/fonts/NotoEmoji-Regular.ttf")));
+    } catch (error) {
+      console.error("trove-kb: the emoji font for PDF exports could not be read", error);
+      return null;
+    }
+  })();
+  return emojiFont;
+}
+
 function drawable(char: string): boolean {
   const code = char.codePointAt(0) ?? 0;
   return (code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff) || WIN_ANSI_EXTRA.has(char);
 }
 
-/** Text the standard fonts can write: substitutes first, then the letter without its accents, then "?". */
+/**
+ * Text the standard fonts can write: substitutes first, then the letter
+ * without its accents, then "?". An emoji that reaches here (in a code
+ * block, in the footer) is left out rather than written as "??".
+ */
 export function winAnsi(text: string): string {
   let out = "";
   for (const char of text) {
     if (drawable(char)) out += char;
     else if (char in SUBSTITUTES) out += SUBSTITUTES[char];
     else if (char === "\n" || char === "\r") out += " ";
+    else if (EMOJI_PARTS.test(char)) continue;
     else {
       const plain = char.normalize("NFKD").replace(/[̀-ͯ]/g, "");
       out += [...plain].every(drawable) && plain !== "" ? plain : "?";
@@ -98,11 +149,20 @@ export function winAnsi(text: string): string {
 
 /* ---------- Inline text: runs of one style, wrapped into lines ---------- */
 
-type Style = { bold?: boolean; italic?: boolean; code?: boolean; link?: boolean };
+type Style = { bold?: boolean; italic?: boolean; code?: boolean; link?: boolean; emoji?: boolean };
 type Run = { text: string; style: Style };
-type Fonts = { regular: PDFFont; bold: PDFFont; italic: PDFFont; boldItalic: PDFFont; mono: PDFFont };
+type Fonts = {
+  regular: PDFFont;
+  bold: PDFFont;
+  italic: PDFFont;
+  boldItalic: PDFFont;
+  mono: PDFFont;
+  /** Embedded only when the document has an emoji to draw and the font could be read. */
+  emoji: PDFFont | null;
+};
 
 function fontFor(fonts: Fonts, style: Style): PDFFont {
+  if (style.emoji && fonts.emoji) return fonts.emoji;
   if (style.code) return fonts.mono;
   if (style.bold && style.italic) return fonts.boldItalic;
   if (style.bold) return fonts.bold;
@@ -196,7 +256,18 @@ function wrap(runs: Run[], fonts: Fonts, size: number, width: number): Line[] {
     used += gap + wordWidth;
   };
 
-  for (const run of runs) {
+  // Emoji are drawn from their own font, and dropped where there is none.
+  const pieces = runs.flatMap((run): Run[] =>
+    splitEmoji(run.text).flatMap((piece) =>
+      !piece.emoji
+        ? [{ text: piece.text, style: run.style }]
+        : fonts.emoji
+          ? [{ text: piece.text, style: { ...run.style, emoji: true } }]
+          : [],
+    ),
+  );
+
+  for (const run of pieces) {
     const font = fontFor(fonts, run.style);
     const measure = (text: string) => font.widthOfTextAtSize(text, sizeFor(run.style, size));
     for (const part of run.text.split(/(\n|\s+)/)) {
@@ -210,7 +281,7 @@ function wrap(runs: Run[], fonts: Fonts, size: number, width: number): Line[] {
         pendingSpace = true;
         continue;
       }
-      let text = winAnsi(part);
+      let text = run.style.emoji ? part : winAnsi(part);
       const gap = pendingSpace && current().length > 0 ? fonts.regular.widthOfTextAtSize(" ", size) : 0;
       pendingSpace = false;
       if (used + gap + measure(text) <= width) {
@@ -507,9 +578,10 @@ export async function articlePdf(
   images: ImageLoader,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(winAnsi(article.title));
-  doc.setSubject(winAnsi(`${marker.place} · ${marker.url}`));
-  doc.setCreator(winAnsi(article.instance));
+  // The document's own properties take any text.
+  doc.setTitle(article.title);
+  doc.setSubject(`${marker.place} · ${marker.url}`);
+  doc.setCreator(article.instance);
   doc.setProducer("Trove KB");
 
   const fonts: Fonts = {
@@ -518,7 +590,15 @@ export async function articlePdf(
     italic: await doc.embedFont(StandardFonts.HelveticaOblique),
     boldItalic: await doc.embedFont(StandardFonts.HelveticaBoldOblique),
     mono: await doc.embedFont(StandardFonts.Courier),
+    emoji: null,
   };
+  if (splitEmoji(`${article.title}\n${article.body}`).some((piece) => piece.emoji)) {
+    const bytes = await emojiFontBytes();
+    if (bytes) {
+      doc.registerFontkit(fontkit);
+      fonts.emoji = await doc.embedFont(bytes, { subset: true });
+    }
+  }
   const layout = new Layout(doc, fonts);
   const context: Context = { layout, images, embedded: new Map() };
 

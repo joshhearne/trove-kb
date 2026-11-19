@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PDFDocument } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { extractText, getDocumentProxy } from "unpdf";
-import { articlePdf, stampPdf, winAnsi, type ExportMarker } from "./export-pdf";
+import { articlePdf, splitEmoji, stampPdf, winAnsi, type ExportMarker } from "./export-pdf";
 
 const marker: ExportMarker = {
   place: "Active Directory › Accounts",
@@ -24,6 +27,30 @@ describe("winAnsi", () => {
     expect(winAnsi("Café “quoted” – €5 › next")).toBe("Café “quoted” – €5 › next");
     expect(winAnsi("Step → done ✓")).toBe("Step -> done v");
     expect(winAnsi("Łódź 日本")).toBe("Lódz ??");
+  });
+
+  it("leaves an emoji out rather than writing it as question marks", () => {
+    expect(winAnsi("Open ⚠️ Alerts 🔧")).toBe("Open  Alerts ");
+  });
+});
+
+describe("splitEmoji", () => {
+  it("sets emoji apart from the text around them, joined sequences whole", () => {
+    expect(splitEmoji("Open ⚠️ Alerts")).toEqual([
+      { text: "Open ", emoji: false },
+      { text: "⚠️", emoji: true },
+      { text: " Alerts", emoji: false },
+    ]);
+    expect(splitEmoji("🔧CB 👩‍💻 🇺🇸 1️⃣").filter((piece) => piece.emoji).map((piece) => piece.text)).toEqual([
+      "🔧",
+      "👩‍💻",
+      "🇺🇸",
+      "1️⃣",
+    ]);
+  });
+
+  it("keeps ©, ® and ™ as text", () => {
+    expect(splitEmoji("Microsoft® Office™ ©2026")).toEqual([{ text: "Microsoft® Office™ ©2026", emoji: false }]);
   });
 });
 
@@ -71,6 +98,43 @@ describe("articlePdf", () => {
     );
     expect(asked).toEqual(["https://elsewhere.example.com/a.png"]);
     expect((await pagesText(bytes))[0]).toContain("[The console]");
+  });
+});
+
+describe("emoji in an exported PDF", () => {
+  it("uses a font whose every glyph is padded to four bytes, which pdf-lib's subsetter needs", () => {
+    const font = fontkit.create(readFileSync(join(process.cwd(), "src/server/kb/fonts/NotoEmoji-Regular.ttf")));
+    const offsets = (font as unknown as { loca: { offsets: number[] } }).loca.offsets;
+    expect(offsets.length).toBeGreaterThan(1000);
+    expect(offsets.filter((offset) => offset % 4 !== 0)).toEqual([]);
+    expect(font.glyphForCodePoint(0x1f527).id).toBeGreaterThan(0);
+  });
+
+  it("draws them from the emoji font, in headings, text and tables, with no question marks", async () => {
+    const bytes = await articlePdf(
+      {
+        title: "Working follow-up alerts",
+        body: "## The Alerts page\n\nOpen ⚠️ **Alerts**. The tabs are **Open** and **All**.\n\n| Score | Priority |\n| --- | --- |\n| 🔧 CB for Service | FYI |\n",
+        format: "markdown",
+        meta: [],
+        instance: "X",
+      },
+      { ...marker, sourceUrl: null },
+      noImages,
+    );
+    const text = (await pagesText(bytes)).join(" ");
+    expect(text).toContain("⚠");
+    expect(text).toContain("🔧");
+    expect(text).not.toContain("?");
+    const doc = await PDFDocument.load(bytes);
+    // Only the glyphs used are embedded: far smaller than the 900 KB font.
+    expect(bytes.byteLength).toBeLessThan(150_000);
+    expect(doc.getPageCount()).toBe(1);
+  });
+
+  it("does not embed the font when there is nothing to draw with it", async () => {
+    const bytes = await articlePdf({ title: "Plain", body: "Text ©2026.", format: "markdown", meta: [], instance: "X" }, marker, noImages);
+    expect(bytes.byteLength).toBeLessThan(20_000);
   });
 });
 
