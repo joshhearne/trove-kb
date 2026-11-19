@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
       "./node_modules/libheif-js/**",
       "./node_modules/jpeg-js/**",
       "./node_modules/pngjs/**",
+      // The emoji font PDF exports draw emoji with, read from disk at runtime.
+      "./src/server/kb/fonts/**",
     ],
   },
   typedRoutes: true,
