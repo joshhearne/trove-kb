@@ -105,6 +105,7 @@ export default async function ArticlePage({
       article={article}
       backHref={`/kb/${article.collectionId}`}
       originalHref={`/api/kb/articles/${article.id}/original`}
+      exportHref={`/api/kb/articles/${article.id}/export`}
       locale={locale}
       t={t}
       actions={
