@@ -89,6 +89,8 @@ export const users = pgTable(
     mfaLockedUntil: timestamp("mfa_locked_until", { withTimezone: true }),
     /** How a revealed secret is shown to them; see src/lib/secret-style.ts. */
     secretStyle: text("secret_style").notNull().default("on"),
+    /** How a Markdown editor opens for them; see src/lib/editor-view.ts. */
+    editorView: text("editor_view").notNull().default("visual"),
     /** The newest release whose What's new pop-up they have closed (change_releases.id). */
     whatsNewSeenReleaseId: integer("whats_new_seen_release_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -102,6 +104,10 @@ export const users = pgTable(
     check(
       "users_secret_style_check",
       sql`${t.secretStyle} IN ('on','colorblind','off')`,
+    ),
+    check(
+      "users_editor_view_check",
+      sql`${t.editorView} IN ('visual','markdown','split')`,
     ),
   ],
 );

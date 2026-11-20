@@ -9,6 +9,7 @@ import { type Role, isAdministrator, loadRoles } from "@/server/auth/roles";
 import { roleExists } from "@/server/services/roles";
 import { ALL_COMPANIES, only, type CompanyScope } from "@/server/auth/company-scope";
 import { SECRET_STYLES, type SecretStyle } from "@/lib/secret-style";
+import { EDITOR_VIEWS, type EditorView } from "@/lib/editor-view";
 
 /**
  * Minimal user administration. Phase 6 needs it because revealing a secret
@@ -174,6 +175,18 @@ export async function setCanRevealSecrets(
 }
 
 export const secretStyleSchema = z.enum(SECRET_STYLES);
+
+export const editorViewSchema = z.enum(EDITOR_VIEWS);
+
+/** A person's own choice of how a Markdown editor opens. No audit: it changes nothing anyone else sees. */
+export async function setEditorView(id: string, view: EditorView): Promise<void> {
+  const [row] = await db
+    .update(users)
+    .set({ editorView: editorViewSchema.parse(view), updatedAt: new Date() })
+    .where(eq(users.id, id))
+    .returning({ id: users.id });
+  if (!row) throw new NotFoundError("User");
+}
 
 /** A person's own choice of how secrets are shown to them. No audit: it changes nothing anyone else sees. */
 export async function setSecretStyle(id: string, style: SecretStyle): Promise<void> {

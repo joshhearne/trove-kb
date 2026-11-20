@@ -247,7 +247,7 @@ export function DocumentEditor({
         </div>
       )}
 
-      <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+      <form action={formAction} className="flex max-w-2xl flex-col gap-6 has-[[data-md-split]]:max-w-none">
         <FormError>{state.error}</FormError>
         <input type="hidden" name="documentId" value={documentId} />
 

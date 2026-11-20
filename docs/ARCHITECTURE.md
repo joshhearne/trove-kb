@@ -508,6 +508,14 @@ appears in the documentation search.
   the point and its text alone does not show it. A document imported before
   this whose file was not kept is taken in again on the next import of the
   same file, hash unchanged or not.
+- **Writing Markdown** (`src/components/markdown/markdown-workspace.tsx`): every
+  Markdown editor, a document's Markdown field and a knowledge base article's
+  body, has a toolbar whose edits live in `src/lib/markdown-edit.ts` (indent
+  moves a line under the item above, past its marker), a Preview tab drawn by
+  the server's own renderer (`previewMarkdownAction`), and on a wide screen
+  (1024px and up) the preview beside the text, with a draggable divider. Each
+  person picks how editors open (`users.editor_view`: visual, markdown, split)
+  in their menu.
 - **Outlines** written by hand (`a.` `b.` under a step, `i.` `ii.` under those,
   indented any amount) are rewritten as nested Markdown lists when an article
   is drawn or exported, and numbered as written (`src/server/kb/outline-lists.ts`,

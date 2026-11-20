@@ -44,7 +44,7 @@ test("an imported text file opens in the editor, and the import leaves the edit 
   await expect(page.locator("#manage").getByText("This is a text file")).toBeVisible();
   await page.getByRole("link", { name: "Edit", exact: true }).click();
   await expect(page).toHaveURL(/\/edit$/);
-  await page.locator("textarea[name=body]").fill("Uplinks on 49 and 50.");
+  await page.getByLabel("Body", { exact: true }).fill("Uplinks on 49 and 50.");
   await page.getByRole("button", { name: /^Save/ }).click();
   await expect(page).toHaveURL(new RegExp(`/kb/articles/${articleId}$`));
   await expect(page.getByText("Uplinks on 49 and 50.")).toBeVisible();

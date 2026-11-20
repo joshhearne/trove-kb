@@ -89,6 +89,7 @@ export const auth = betterAuth({
       canRevealSecrets: { type: "boolean", defaultValue: false, input: false },
       mustChangePassword: { type: "boolean", defaultValue: false, input: false },
       secretStyle: { type: "string", defaultValue: "on", input: false },
+      editorView: { type: "string", defaultValue: "visual", input: false },
     },
   },
 

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownWorkspace } from "@/components/markdown/markdown-workspace";
 import { FormError } from "@/components/ui/alert";
 import { useLocale, useMessages } from "@/i18n/client";
 import { formatBytes } from "@/i18n/format";
@@ -298,7 +298,8 @@ export function KbEditor({
     <form
       action={uploadMode ? undefined : formAction}
       onSubmit={uploadMode ? (event) => void upload(event) : undefined}
-      className="flex max-w-4xl flex-col gap-5"
+      // The editor and its live preview side by side take the page's width.
+      className="flex max-w-4xl flex-col gap-5 has-[[data-md-split]]:max-w-none"
     >
       <input type="hidden" name="collectionId" value={collectionId} />
       {values.articleId && <input type="hidden" name="articleId" value={values.articleId} />}
@@ -428,15 +429,16 @@ export function KbEditor({
         </Field>
       ) : (
       <Field id={ids.body} label={t.body} hint={t.bodyHint} error={state.fieldErrors?.body ?? preview?.error ?? undefined}>
-        <Textarea
-          id={ids.body}
-          name="body"
+        <MarkdownWorkspace
           value={body}
-          onChange={(event) => setBody(event.target.value)}
-          spellCheck
-          className="min-h-96 font-mono text-sm"
-          aria-invalid={!!state.fieldErrors?.body || !!preview?.error}
+          onChange={setBody}
+          flavor="article"
+          textareaId={ids.body}
+          invalid={!!state.fieldErrors?.body || !!preview?.error}
+          minHeightClass="min-h-96"
+          monoClass="font-mono text-sm"
         />
+        <input type="hidden" name="body" value={body} />
       </Field>
       )}
 
@@ -526,7 +528,7 @@ export function KbEditor({
   if (!header) return form;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex max-w-4xl flex-wrap items-end justify-between gap-3">
+      <div className="flex max-w-4xl flex-wrap items-end justify-between gap-3 has-[~form_[data-md-split]]:max-w-none">
         <div>{header}</div>
         {uploadToggle}
       </div>

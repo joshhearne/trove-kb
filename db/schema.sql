@@ -696,6 +696,12 @@ ALTER TABLE api_key_kb_collections ADD COLUMN reactions boolean NOT NULL DEFAULT
 ALTER TABLE users ADD COLUMN secret_style text NOT NULL DEFAULT 'on';
 ALTER TABLE users ADD CONSTRAINT users_secret_style_check CHECK (secret_style IN ('on','colorblind','off'));
 
+-- How a Markdown editor opens for a person: visual with the formatting
+-- toolbar, Markdown source with its own toolbar, or source with a live
+-- preview beside it. Visual by default, as before.
+ALTER TABLE users ADD COLUMN editor_view text NOT NULL DEFAULT 'visual';
+ALTER TABLE users ADD CONSTRAINT users_editor_view_check CHECK (editor_view IN ('visual','markdown','split'));
+
 -- ---------- Domain checks that run on their own ----------
 -- The worker re-runs a record's chosen checks on an interval, keeps a compact
 -- summary of the last result so the next run can say what changed, and

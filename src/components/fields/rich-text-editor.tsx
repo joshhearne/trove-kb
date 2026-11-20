@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TableKit } from "@tiptap/extension-table";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "tiptap-markdown";
-import { Textarea } from "@/components/ui/textarea";
+import { IndentDecrease, IndentIncrease } from "lucide-react";
+import { MarkdownWorkspace } from "@/components/markdown/markdown-workspace";
 import { cn } from "@/lib/utils";
 import { useMessages } from "@/i18n/client";
 import type { Messages } from "@/i18n/en-US";
@@ -15,7 +15,6 @@ import type { Messages } from "@/i18n/en-US";
 type MarkdownStorage = { markdown: { getMarkdown: () => string } };
 
 type Mode = "markdown" | "richtext";
-type View = "visual" | "source";
 
 type Labels = Messages["documents"]["richText"];
 
@@ -41,6 +40,22 @@ const TOOLS: readonly Tool[] = [
     label: "▦ Table",
     mark: "table",
     run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+];
+
+/** One level in or out, for the list item the cursor is in: plain, or a checklist's. */
+const INDENT_TOOLS: readonly { key: "indent" | "outdent"; run: (editor: Editor) => void }[] = [
+  {
+    key: "outdent",
+    run: (e) => {
+      if (!e.chain().focus().liftListItem("listItem").run()) e.chain().focus().liftListItem("taskItem").run();
+    },
+  },
+  {
+    key: "indent",
+    run: (e) => {
+      if (!e.chain().focus().sinkListItem("listItem").run()) e.chain().focus().sinkListItem("taskItem").run();
+    },
   },
 ];
 
@@ -80,7 +95,6 @@ export function RichTextEditor({
 }) {
   const t = useMessages();
   const labels = t.documents.richText;
-  const [view, setView] = useState<View>("visual");
 
   const editor = useEditor({
     // Rendering on the server would not match the client's ProseMirror output.
@@ -125,92 +139,90 @@ export function RichTextEditor({
     selector: ({ editor: instance }) => ({
       marks: TOOLS.map((tool) => (instance ? instance.isActive(tool.mark) : false)),
       inTable: instance ? instance.isActive("table") : false,
+      inList: instance ? instance.isActive("listItem") || instance.isActive("taskItem") : false,
     }),
   });
 
-  function show(next: View) {
-    if (next === view) return;
-    if (next === "visual" && editor) {
-      // The source may have changed; the visual view starts from it again.
-      // tiptap-markdown's setContent takes Markdown, so the source goes in as is.
-      editor.commands.setContent(value);
-    }
-    setView(next);
-  }
-
-  const sourceShown = mode === "markdown" && view === "source";
-
-  return (
-    <div className="rounded-md border focus-within:ring-2 focus-within:ring-[var(--ring)]">
-      <div className="flex flex-wrap items-center gap-1 border-b p-1">
-        {!sourceShown &&
-          TOOLS.map((tool, index) => (
+  const toolbar = (
+    <>
+      {TOOLS.map((tool, index) => (
+        <button
+          key={tool.key}
+          type="button"
+          title={labels[tool.key]}
+          aria-label={labels[tool.key]}
+          aria-pressed={active?.marks[index] ?? false}
+          onClick={() => editor && tool.run(editor)}
+          className={cn(
+            "rounded px-2 py-1 text-xs font-medium hover:bg-[var(--muted)]",
+            active?.marks[index] && "bg-[var(--muted)]",
+          )}
+        >
+          {tool.label}
+        </button>
+      ))}
+      <span className="flex items-center gap-0.5 border-l pl-1">
+        {INDENT_TOOLS.map((tool) => {
+          const Icon = tool.key === "indent" ? IndentIncrease : IndentDecrease;
+          const label = t.markdownEditor.tools[tool.key];
+          return (
             <button
               key={tool.key}
               type="button"
-              title={labels[tool.key]}
-              aria-label={labels[tool.key]}
-              aria-pressed={active?.marks[index] ?? false}
+              title={label}
+              aria-label={label}
+              disabled={!active?.inList}
               onClick={() => editor && tool.run(editor)}
-              className={cn(
-                "rounded px-2 py-1 text-xs font-medium hover:bg-[var(--muted)]",
-                active?.marks[index] && "bg-[var(--muted)]",
-              )}
+              className="rounded p-1.5 hover:bg-[var(--muted)] disabled:opacity-40"
             >
-              {tool.label}
+              <Icon className="size-4" aria-hidden />
+            </button>
+          );
+        })}
+      </span>
+      {active?.inTable && (
+        <span className="flex flex-wrap items-center gap-1 border-l pl-1" role="group" aria-label={labels.table}>
+          {TABLE_TOOLS.map((tool) => (
+            <button
+              key={tool.key}
+              type="button"
+              onClick={() => editor && tool.run(editor)}
+              className="rounded px-2 py-1 text-xs hover:bg-[var(--muted)]"
+            >
+              {labels[tool.key]}
             </button>
           ))}
-        {!sourceShown && active?.inTable && (
-          <span className="flex flex-wrap items-center gap-1 border-l pl-1" role="group" aria-label={labels.table}>
-            {TABLE_TOOLS.map((tool) => (
-              <button
-                key={tool.key}
-                type="button"
-                onClick={() => editor && tool.run(editor)}
-                className="rounded px-2 py-1 text-xs hover:bg-[var(--muted)]"
-              >
-                {labels[tool.key]}
-              </button>
-            ))}
-          </span>
-        )}
-        {mode === "markdown" && (
-          <span
-            role="group"
-            aria-label={labels.view}
-            className="ml-auto flex items-center gap-0.5 rounded-md border p-0.5 text-xs"
-          >
-            {(["visual", "source"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={view === option}
-                onClick={() => show(option)}
-                className={cn(
-                  "rounded px-2 py-0.5 font-medium hover:bg-[var(--muted)]",
-                  view === option && "bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]",
-                )}
-              >
-                {labels[option]}
-              </button>
-            ))}
-          </span>
-        )}
-      </div>
-      {/* Stays mounted while the source is shown, so the visual view keeps its state. */}
-      <div className={cn(sourceShown && "hidden")}>
-        <EditorContent editor={editor} />
-      </div>
-      {sourceShown && (
-        <Textarea
+        </span>
+      )}
+    </>
+  );
+
+  // A markdown field: the visual editor, the source with its own toolbar, a
+  // preview, and the two side by side on a wide screen.
+  if (mode === "markdown") {
+    return (
+      <>
+        <MarkdownWorkspace
           value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-labelledby={ariaLabelledBy}
-          spellCheck={false}
-          className="min-h-40 rounded-none border-0 font-mono text-xs focus-visible:ring-0"
+          onChange={onChange}
+          flavor="field"
+          visual={<EditorContent editor={editor} />}
+          visualToolbar={toolbar}
+          // The source may have changed; the visual view starts from it again.
+          // tiptap-markdown's setContent takes Markdown, so the source goes in as is.
+          onShowVisual={() => editor?.commands.setContent(value)}
+          ariaLabelledBy={ariaLabelledBy}
           placeholder={labels.sourceHint}
         />
-      )}
+        <input type="hidden" name={name} value={value} />
+      </>
+    );
+  }
+
+  return (
+    <div className="rounded-md border focus-within:ring-2 focus-within:ring-[var(--ring)]">
+      <div className="flex flex-wrap items-center gap-1 border-b p-1">{toolbar}</div>
+      <EditorContent editor={editor} />
       <input type="hidden" name={name} value={value} />
     </div>
   );
