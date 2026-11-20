@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, Download, ExternalLink, FileText, ListChecks 
 import { Chip } from "@/components/ui/chip";
 import { RunbookRun, RunbookSteps, type RenderedStep } from "@/components/kb-runbook-steps";
 import { deriveRunbook, type RunbookStep } from "@/server/kb/runbook";
-import { renderMarkdown } from "@/server/fields/render";
+import { renderArticleMarkdown, renderMarkdown } from "@/server/fields/render";
 import { outlineHtml } from "@/server/kb/outline";
 import { embedVideos } from "@/server/kb/video";
 import { KbOutline } from "@/components/kb-outline";
@@ -136,18 +136,18 @@ export function KbArticle({
     ? runbook.segments
         .map((segment, index) =>
           segment.kind === "markdown"
-            ? embedVideos(renderMarkdown(index === 0 ? withoutLeadingTitle(segment.text, article.title) : segment.text))
+            ? embedVideos(renderArticleMarkdown(index === 0 ? withoutLeadingTitle(segment.text, article.title) : segment.text))
             : MARK,
         )
         .join("")
     : markdown
-      ? embedVideos(renderMarkdown(withoutLeadingTitle(article.body, article.title)))
+      ? embedVideos(renderArticleMarkdown(withoutLeadingTitle(article.body, article.title)))
       : null;
   const drawn = source !== null ? outlineHtml(source) : null;
   const rendered = (step: RunbookStep): RenderedStep => ({
     id: step.id,
     html: renderMarkdown(step.text).replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1"),
-    noteHtml: step.note ? embedVideos(renderMarkdown(step.note)) : null,
+    noteHtml: step.note ? embedVideos(renderArticleMarkdown(step.note)) : null,
     canned: step.canned ?? null,
   });
   const pieces =

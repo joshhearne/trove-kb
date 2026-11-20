@@ -24,6 +24,8 @@ const OPTIONS: sanitizeHtml.IOptions = {
     th: ["colspan", "rowspan", "scope"],
     input: ["type", "checked", "disabled"],
     ul: ["data-type"],
+    // How an outline was numbered: a, b, c or i, ii, iii (src/server/kb/outline-lists.ts).
+    ol: ["data-list"],
     li: ["data-type", "data-checked"],
     "*": ["class"],
   },

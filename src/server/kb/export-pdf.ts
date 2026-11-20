@@ -3,6 +3,7 @@ import { Lexer, type Token, type Tokens } from "marked";
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { isWorkers } from "@/lib/runtime";
+import { listMarker, listTypeOf, normalizeOutlines, type ListType } from "@/server/kb/outline-lists";
 
 /**
  * A knowledge base article written out as a PDF, and the identifying footer
@@ -357,7 +358,13 @@ class Layout {
 
 /* ---------- Blocks ---------- */
 
-type Context = { layout: Layout; images: ImageLoader; embedded: Map<string, PDFImage | null> };
+type Context = {
+  layout: Layout;
+  images: ImageLoader;
+  embedded: Map<string, PDFImage | null>;
+  /** Set by an outline's marker comment: how the list after it is numbered. */
+  listType: ListType | null;
+};
 
 const HEADING_SIZES = [0, 18, 15, 13, 12, 11, 11];
 
@@ -429,9 +436,16 @@ async function blocks(context: Context, tokens: Token[], x: number, width: numbe
       case "list": {
         const list = token as Tokens.List;
         const start = typeof list.start === "number" ? list.start : 1;
+        // A lettered or roman outline is numbered as written: a, b, c or i, ii, iii.
+        const type = list.ordered ? (context.listType ?? "decimal") : "bullet";
+        context.listType = null;
+        const number = (at: number) => `${listMarker(type, start + at)}.`;
+        const widest = list.ordered
+          ? Math.max(...list.items.map((_, at) => layout.fonts.regular.widthOfTextAtSize(number(at), 10.5)))
+          : 0;
         for (const [index, item] of list.items.entries()) {
-          const marker = list.ordered ? `${start + index}.` : item.task ? (item.checked ? "[x]" : "[ ]") : "•";
-          const indent = list.ordered ? Math.max(18, layout.fonts.regular.widthOfTextAtSize(`${start + list.items.length}.`, 10.5) + 6) : 14;
+          const marker = list.ordered ? number(index) : item.task ? (item.checked ? "[x]" : "[ ]") : "•";
+          const indent = list.ordered ? Math.max(18, widest + 6) : 14;
           layout.ensure(15);
           layout.page.drawText(winAnsi(marker), { x, y: layout.y - 10.5, size: 10.5, font: layout.fonts.regular, color: TEXT });
           await blocks(context, item.tokens.filter((inner) => inner.type !== "checkbox"), x + indent, width - indent);
@@ -502,6 +516,11 @@ async function blocks(context: Context, tokens: Token[], x: number, width: numbe
         layout.gap(12);
         break;
       case "html": {
+        const type = listTypeOf((token as Tokens.HTML).text);
+        if (type) {
+          context.listType = type;
+          break;
+        }
         const text = htmlText((token as Tokens.HTML).text).trim();
         if (text) {
           layout.text([{ text, style: {} }], x, width, 10.5);
@@ -600,7 +619,7 @@ export async function articlePdf(
     }
   }
   const layout = new Layout(doc, fonts);
-  const context: Context = { layout, images, embedded: new Map() };
+  const context: Context = { layout, images, embedded: new Map(), listType: null };
 
   layout.text([{ text: article.title, style: { bold: true } }], MARGIN.x, CONTENT_WIDTH, 20);
   if (article.meta.length > 0) {
@@ -617,7 +636,7 @@ export async function articlePdf(
   layout.gap(12);
 
   if (article.format === "markdown") {
-    await blocks(context, new Lexer({ gfm: true }).lex(article.body), MARGIN.x, CONTENT_WIDTH);
+    await blocks(context, new Lexer({ gfm: true }).lex(normalizeOutlines(article.body)), MARGIN.x, CONTENT_WIDTH);
   } else {
     for (const paragraph of article.body.split(/\n{2,}/)) {
       layout.text([{ text: paragraph, style: {} }], MARGIN.x, CONTENT_WIDTH, 10.5);

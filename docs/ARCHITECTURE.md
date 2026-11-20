@@ -508,6 +508,11 @@ appears in the documentation search.
   the point and its text alone does not show it. A document imported before
   this whose file was not kept is taken in again on the next import of the
   same file, hash unchanged or not.
+- **Outlines** written by hand (`a.` `b.` under a step, `i.` `ii.` under those,
+  indented any amount) are rewritten as nested Markdown lists when an article
+  is drawn or exported, and numbered as written (`src/server/kb/outline-lists.ts`,
+  `ol[data-list]`). What is stored is not changed, and a list with no lettered
+  or roman level is left exactly as it was.
 - **Export** (`src/server/services/kb-export.ts`) gives a reader an article as
   a file, at `/api/kb/articles/:id/export?format=` and on the public site at
   `/pub/kb/articles/:id/export?format=`: `pdf`, `md`, or `original` (the kept

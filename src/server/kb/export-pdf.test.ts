@@ -138,6 +138,24 @@ describe("emoji in an exported PDF", () => {
   });
 });
 
+describe("outlines in an exported PDF", () => {
+  it("numbers lettered and roman sub-items as written, under their step", async () => {
+    const bytes = await articlePdf(
+      {
+        title: "New user",
+        body: "9. User Locations\n  a. Pick Location\n    i. Select Role(s)\n    ii. Department\n  b. Repeat as needed\n10. Complete Employee Info",
+        format: "markdown",
+        meta: [],
+        instance: "X",
+      },
+      { ...marker, sourceUrl: null },
+      noImages,
+    );
+    const text = (await pagesText(bytes))[0]!;
+    expect(text).toMatch(/9\. User Locations a\. Pick Location i\. Select Role\(s\) ii\. Department b\. Repeat as needed 10\. Complete Employee Info/);
+  });
+});
+
 describe("stampPdf", () => {
   it("adds the footer to every page of a document that came as a PDF", async () => {
     const source = await PDFDocument.create();
