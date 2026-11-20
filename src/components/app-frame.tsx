@@ -31,6 +31,7 @@ export async function AppFrame({
       canManageDocTypes={canManageDocTypes(user.role)}
       theme={theme}
       secretStyle={canUseSecretFields(user.role) ? user.secretStyle : null}
+      editorView={user.editorView}
       branding={branding}
       footer={<AppFooter />}
       signOut={signOutAction}

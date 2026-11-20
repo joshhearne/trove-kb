@@ -1,0 +1,2 @@
+ALTER TABLE "users" ADD COLUMN "editor_view" text DEFAULT 'visual' NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_editor_view_check" CHECK ("users"."editor_view" IN ('visual','markdown','split'));

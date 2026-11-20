@@ -508,6 +508,34 @@ appears in the documentation search.
   the point and its text alone does not show it. A document imported before
   this whose file was not kept is taken in again on the next import of the
   same file, hash unchanged or not.
+- **Writing Markdown** (`src/components/markdown/markdown-workspace.tsx`): every
+  Markdown editor, a document's Markdown field and a knowledge base article's
+  body, has a toolbar whose edits live in `src/lib/markdown-edit.ts` (indent
+  moves a line under the item above, past its marker), a Preview tab drawn by
+  the server's own renderer (`previewMarkdownAction`), and on a wide screen
+  (1024px and up) the preview beside the text, with a draggable divider. Each
+  person picks how editors open (`users.editor_view`: visual, markdown, split)
+  in their menu.
+- **Links between pages** (`src/lib/wikilinks.ts`, `src/server/services/wikilinks.ts`):
+  `[[doc:<id>|Label]]` and `[[kb:<id>|Label]]`, the id first so a link survives
+  a rename or a move. Typing `[[` in a Markdown editor offers pages the author
+  may open (documents of their companies, articles of their collections) and
+  "Create …", which makes a Markdown-only document in the same company or an
+  article in the same collection, saved like any page. Every page resolves its
+  links for the person reading it: a page they cannot open is drawn as its
+  label alone, never a link and never its current title (out of scope is not
+  found). The author is warned, in the list and under the preview, when some
+  readers could not follow a link: another company's document, a document from
+  a knowledge base article, an article kept to fewer companies, or one off the
+  public site. A document's `[[doc:…]]` links are written to `document_links`,
+  so they show as backlinks; exports write them as ordinary links, or the label
+  where the reader could not open the page. The visual editor keeps a link as
+  one piece (`WikilinkNode`) and writes it back as it was.
+- **Outlines** written by hand (`a.` `b.` under a step, `i.` `ii.` under those,
+  indented any amount) are rewritten as nested Markdown lists when an article
+  is drawn or exported, and numbered as written (`src/server/kb/outline-lists.ts`,
+  `ol[data-list]`). What is stored is not changed, and a list with no lettered
+  or roman level is left exactly as it was.
 - **Export** (`src/server/services/kb-export.ts`) gives a reader an article as
   a file, at `/api/kb/articles/:id/export?format=` and on the public site at
   `/pub/kb/articles/:id/export?format=`: `pdf`, `md`, or `original` (the kept

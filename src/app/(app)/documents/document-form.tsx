@@ -1,5 +1,7 @@
 "use client";
 
+import { WikilinkProvider } from "@/components/markdown/wikilink-context";
+
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -81,7 +83,8 @@ export function DocumentForm({
   }
 
   return (
-    <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+    <WikilinkProvider value={{ kind: "document", companyId, documentId: null, locationId }}>
+    <form action={formAction} className="flex max-w-2xl flex-col gap-6 has-[[data-md-split]]:max-w-none">
       <FormError>{state.error ?? inlineError}</FormError>
       {notice && (
         <p role="status" className="text-sm text-[var(--muted-foreground)]">
@@ -126,5 +129,6 @@ export function DocumentForm({
         <Submit label={t.documents.create} />
       </div>
     </form>
+    </WikilinkProvider>
   );
 }

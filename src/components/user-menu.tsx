@@ -13,6 +13,8 @@ import { setThemeAction } from "@/app/theme-actions";
 import { THEMES, type Theme } from "@/lib/theme";
 import { SECRET_STYLES, type SecretStyle } from "@/lib/secret-style";
 import { setSecretStyleAction } from "@/app/secret-style-actions";
+import { setEditorViewAction } from "@/app/editor-view-actions";
+import { EDITOR_VIEWS, type EditorView } from "@/lib/editor-view";
 import { Select } from "@/components/ui/select";
 
 /**
@@ -25,6 +27,7 @@ export function UserMenu({
   locale,
   theme,
   secretStyle,
+  editorView,
   signOut,
 }: {
   user: { name: string; email: string; role: string };
@@ -34,6 +37,8 @@ export function UserMenu({
   theme: Theme;
   /** How revealed secrets are shown; null for a role that never sees one. */
   secretStyle: SecretStyle | null;
+  /** How their Markdown editors open. */
+  editorView: EditorView;
   signOut: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -43,6 +48,7 @@ export function UserMenu({
   const localeFormRef = useRef<HTMLFormElement>(null);
   const themeFormRef = useRef<HTMLFormElement>(null);
   const secretStyleFormRef = useRef<HTMLFormElement>(null);
+  const editorViewFormRef = useRef<HTMLFormElement>(null);
   const t = useMessages();
 
   const initials = initialsFor(user.name, user.email);
@@ -205,6 +211,26 @@ export function UserMenu({
               </Select>
             </form>
           )}
+
+          <form ref={editorViewFormRef} action={setEditorViewAction} className="flex flex-col gap-1 pb-3">
+            <label htmlFor="editorView" className="text-sm font-medium">
+              {t.app.editorView}
+            </label>
+            <Select
+              id="editorView"
+              name="editorView"
+              defaultValue={editorView}
+              onChange={() => editorViewFormRef.current?.requestSubmit()}
+              className={select}
+            >
+              {EDITOR_VIEWS.map((option) => (
+                <option key={option} value={option}>
+                  {t.app.editorViews[option]}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-[var(--muted-foreground)]">{t.app.editorViewHint}</p>
+          </form>
 
           <form action={signOut} className="border-t pt-3">
             <Button

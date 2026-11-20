@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { resolveWikilinks } from "@/server/services/wikilinks";
 import { KbArticle } from "@/components/kb-article";
 import { ReactionBar } from "@/components/kb-reactions";
 import { publicIdentity } from "@/server/kb/identity";
@@ -31,6 +32,7 @@ export default async function PublicArticlePage({
 
   return (
     <KbArticle
+      links={await resolveWikilinks([found.body], { scope: reader.scope, kb: reader, publicSite: true })}
       article={article}
       backHref={`/pub/kb/${article.collectionId}`}
       originalHref={`/pub/kb/articles/${article.id}/original`}

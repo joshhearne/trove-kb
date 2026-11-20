@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { EditorViewProvider } from "@/components/editor-view-context";
+import type { EditorView } from "@/lib/editor-view";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
@@ -31,6 +33,8 @@ export type AppShellProps = {
   theme: Theme;
   /** Null for a role that never meets a secret field: no attribute, no choice. */
   secretStyle: SecretStyle | null;
+  /** How their Markdown editors open. */
+  editorView: EditorView;
   branding: Branding;
   /** Rendered by the server layout: the footer reads messages of its own. */
   footer: React.ReactNode;
@@ -50,6 +54,7 @@ export function AppShell({
   canManageDocTypes,
   theme,
   secretStyle,
+  editorView,
   branding,
   footer,
   signOut,
@@ -111,6 +116,7 @@ export function AppShell({
             locale={locale}
             theme={theme}
             secretStyle={secretStyle}
+            editorView={editorView}
             signOut={signOut}
           />
         </div>
@@ -123,7 +129,9 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+          <main className="min-w-0 flex-1 p-4 md:p-8">
+            <EditorViewProvider view={editorView}>{children}</EditorViewProvider>
+          </main>
           {footer}
         </div>
       </div>

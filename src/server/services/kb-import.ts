@@ -1,4 +1,5 @@
 import "server-only";
+import { wikilinkLabels } from "@/lib/wikilinks";
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/server/db";
@@ -146,7 +147,7 @@ export async function rewriteChunks(
   extraction: string,
 ): Promise<void> {
   await tx.delete(kbChunks).where(eq(kbChunks.articleId, articleId));
-  const chunks = extraction === "ok" ? chunkText(body) : [];
+  const chunks = extraction === "ok" ? chunkText(wikilinkLabels(body)) : [];
   for (let at = 0; at < chunks.length; at += CHUNK_BATCH) {
     await tx.insert(kbChunks).values(
       chunks.slice(at, at + CHUNK_BATCH).map((chunk) => ({
@@ -243,7 +244,7 @@ export async function storeArticle(
       : { publicHidden: article.publicHidden, hiddenBy: article.publicHidden ? "manual" : null }),
   };
 
-  const chunks = article.extraction === "ok" ? chunkText(body) : [];
+  const chunks = article.extraction === "ok" ? chunkText(wikilinkLabels(body)) : [];
 
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -959,7 +960,7 @@ export async function tidyStoredArticles(
     options.log?.(`${row.id}  ${row.title}`);
     if (options.dryRun) continue;
 
-    const chunks = chunkText(body);
+    const chunks = chunkText(wikilinkLabels(body));
     await db.transaction(async (tx) => {
       await tx.update(kbArticles).set({ body, updatedAt: new Date() }).where(eq(kbArticles.id, row.id));
       await tx.delete(kbChunks).where(eq(kbChunks.articleId, row.id));

@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownWorkspace } from "@/components/markdown/markdown-workspace";
+import { WikilinkProvider } from "@/components/markdown/wikilink-context";
 import { FormError } from "@/components/ui/alert";
 import { useLocale, useMessages } from "@/i18n/client";
 import { formatBytes } from "@/i18n/format";
@@ -143,6 +144,7 @@ export function KbEditor({
   textOnly = false,
   header,
   maxUploadMb,
+  collectionPublic = false,
 }: {
   values: EditorValues;
   backHref: string;
@@ -161,6 +163,8 @@ export function KbEditor({
   header?: ReactNode;
   /** Offers uploading a document instead of writing, for a new article. */
   maxUploadMb?: number;
+  /** The collection is on the public site, so links are checked against what visitors can open. */
+  collectionPublic?: boolean;
 }) {
   const messages = useMessages();
   const locale = useLocale();
@@ -176,6 +180,7 @@ export function KbEditor({
   const ids = { title: useId(), category: useId(), subcategory: useId(), body: useId(), collection: useId() };
   const [body, setBody] = useState(values.body);
   const [runbook, setRunbook] = useState(values.kind === "runbook");
+  const [internalOnly, setInternalOnly] = useState(values.internalOnly);
   const [category, setCategory] = useState(values.category);
   const [subcategory, setSubcategory] = useState(values.subcategory);
   const [categories, setCategories] = useState(initialCategories);
@@ -294,11 +299,23 @@ export function KbEditor({
     </Button>
   ) : null;
 
+  const links = useMemo(
+    () => ({
+      kind: "article" as const,
+      collectionId,
+      articleId: values.articleId ?? null,
+      publicSite: collectionPublic && !internalOnly,
+    }),
+    [collectionId, values.articleId, collectionPublic, internalOnly],
+  );
+
   const form = (
+    <WikilinkProvider value={links}>
     <form
       action={uploadMode ? undefined : formAction}
       onSubmit={uploadMode ? (event) => void upload(event) : undefined}
-      className="flex max-w-4xl flex-col gap-5"
+      // The editor and its live preview side by side take the page's width.
+      className="flex max-w-4xl flex-col gap-5 has-[[data-md-split]]:max-w-none"
     >
       <input type="hidden" name="collectionId" value={collectionId} />
       {values.articleId && <input type="hidden" name="articleId" value={values.articleId} />}
@@ -395,7 +412,8 @@ export function KbEditor({
         <input
           type="checkbox"
           name="internalOnly"
-          defaultChecked={values.internalOnly}
+          checked={internalOnly}
+          onChange={(event) => setInternalOnly(event.target.checked)}
           className="mt-0.5 size-4 accent-[var(--primary)]"
         />
         <span>
@@ -428,15 +446,16 @@ export function KbEditor({
         </Field>
       ) : (
       <Field id={ids.body} label={t.body} hint={t.bodyHint} error={state.fieldErrors?.body ?? preview?.error ?? undefined}>
-        <Textarea
-          id={ids.body}
-          name="body"
+        <MarkdownWorkspace
           value={body}
-          onChange={(event) => setBody(event.target.value)}
-          spellCheck
-          className="min-h-96 font-mono text-sm"
-          aria-invalid={!!state.fieldErrors?.body || !!preview?.error}
+          onChange={setBody}
+          flavor="article"
+          textareaId={ids.body}
+          invalid={!!state.fieldErrors?.body || !!preview?.error}
+          minHeightClass="min-h-96"
+          monoClass="font-mono text-sm"
         />
+        <input type="hidden" name="body" value={body} />
       </Field>
       )}
 
@@ -521,12 +540,13 @@ export function KbEditor({
         </div>
       </dialog>
     </form>
+    </WikilinkProvider>
   );
 
   if (!header) return form;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex max-w-4xl flex-wrap items-end justify-between gap-3">
+      <div className="flex max-w-4xl flex-wrap items-end justify-between gap-3 has-[~form_[data-md-split]]:max-w-none">
         <div>{header}</div>
         {uploadToggle}
       </div>

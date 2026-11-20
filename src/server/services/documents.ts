@@ -1,4 +1,5 @@
 import "server-only";
+import { wikilinkTargets } from "@/lib/wikilinks";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { db, type Tx } from "@/server/db";
@@ -233,6 +234,24 @@ async function syncDocumentLinks(
         ? [{ fromDoc: documentId, toDoc: target, fieldId: field.id }]
         : [];
     });
+
+  // A markdown field's [[doc:…]] links are links too, and show on the page linked to.
+  const written = fieldList
+    .filter((field) => field.fieldType === "markdown" && typeof values[field.id] === "string")
+    .flatMap((field) =>
+      wikilinkTargets(String(values[field.id]))
+        .filter((target) => target.kind === "doc" && target.id !== documentId)
+        .map((target) => ({ fromDoc: documentId, toDoc: target.id, fieldId: field.id })),
+    );
+  if (written.length > 0) {
+    // Only pages that exist: a link to one since removed is drawn as its label, and points nowhere.
+    const existing = await tx
+      .select({ id: documents.id })
+      .from(documents)
+      .where(inArray(documents.id, [...new Set(written.map((row) => row.toDoc))]));
+    const known = new Set(existing.map((row) => row.id));
+    rows.push(...written.filter((row) => known.has(row.toDoc)));
+  }
 
   if (rows.length > 0) await tx.insert(documentLinks).values(rows).onConflictDoNothing();
 }

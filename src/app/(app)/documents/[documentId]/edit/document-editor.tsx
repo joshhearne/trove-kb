@@ -1,5 +1,7 @@
 "use client";
 
+import { WikilinkProvider } from "@/components/markdown/wikilink-context";
+
 import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -87,7 +89,12 @@ export function DocumentEditor({
   secretItems,
   canManageTemplate,
   instanceMacFormat,
+  companyId,
+  locationId,
 }: {
+  /** Where the document sits, for its [[ links. */
+  companyId: string;
+  locationId: string | null;
   documentId: string;
   docTypeId: string;
   docTypeName: string;
@@ -247,7 +254,8 @@ export function DocumentEditor({
         </div>
       )}
 
-      <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+      <WikilinkProvider value={{ kind: "document", companyId, documentId, locationId }}>
+      <form action={formAction} className="flex max-w-2xl flex-col gap-6 has-[[data-md-split]]:max-w-none">
         <FormError>{state.error}</FormError>
         <input type="hidden" name="documentId" value={documentId} />
 
@@ -302,6 +310,7 @@ export function DocumentEditor({
           <SaveButton />
         </div>
       </form>
+      </WikilinkProvider>
 
       {promoting && (
         <FieldDraftPanel

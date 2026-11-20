@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { can, isAdministrator, loadRoles, ROLES, type Role } from "@/server/auth/roles";
 import type { Permission } from "@/server/auth/permissions";
 import { DEFAULT_SECRET_STYLE, isSecretStyle, type SecretStyle } from "@/lib/secret-style";
+import { DEFAULT_EDITOR_VIEW, isEditorView, type EditorView } from "@/lib/editor-view";
 import { ForbiddenError } from "@/server/services/errors";
 import { companyScopeForUser } from "@/server/services/users";
 import { hasSecondFactor, mfaDeadlineFor, STEP_UP_MINUTES } from "@/server/services/mfa";
@@ -23,6 +24,8 @@ export type CurrentUser = {
   canRevealSecrets: boolean;
   /** How a revealed secret is shown to them. Meaningful only where canUseSecretFields. */
   secretStyle: SecretStyle;
+  /** How a Markdown editor opens for them. */
+  editorView: EditorView;
   /** An administrator gave them a temporary password; they choose their own next. */
   mustChangePassword: boolean;
   /** This session, for the second step and for ending the others. */
@@ -67,6 +70,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: toRole(user.role),
     canRevealSecrets: user.canRevealSecrets === true,
     secretStyle: isSecretStyle(user.secretStyle) ? user.secretStyle : DEFAULT_SECRET_STYLE,
+    editorView: isEditorView(user.editorView) ? user.editorView : DEFAULT_EDITOR_VIEW,
     mustChangePassword: (user as { mustChangePassword?: boolean }).mustChangePassword === true,
     sessionToken: session.session.token,
     mfa: {
