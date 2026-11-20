@@ -7,6 +7,7 @@ import { getDocumentDetail, listRevisions } from "@/server/services/documents";
 import { getCompanyBranding } from "@/server/services/branding";
 import { BrandAccent } from "@/components/brand";
 import { renderFieldValue } from "@/server/fields/render";
+import { resolveWikilinks } from "@/server/services/wikilinks";
 import { formatDateTime } from "@/i18n/format";
 import { getI18n } from "@/i18n/server";
 
@@ -17,7 +18,7 @@ export default async function RevisionsPage({
 }: {
   params: Promise<{ documentId: string }>;
 }) {
-  const { scope } = await requireScopedUser();
+  const { user, scope } = await requireScopedUser();
   const { documentId } = await params;
 
   const detail = await getDocumentDetail(documentId, scope);
@@ -26,6 +27,14 @@ export default async function RevisionsPage({
   const revisions = await listRevisions(documentId, scope);
   const branding = await getCompanyBranding(detail.document.companyId, scope);
   const { locale, messages: t } = await getI18n();
+  const links = await resolveWikilinks(
+    revisions.flatMap((revision) =>
+      detail.fields
+        .filter((field) => field.fieldType === "markdown")
+        .map((field) => String(revision.fieldValues?.[field.id] ?? "")),
+    ),
+    { scope, kb: { scope, via: "app", userId: user.id } },
+  );
 
   return (
     <BrandAccent brand={branding} className="flex flex-col gap-6">
@@ -71,6 +80,7 @@ export default async function RevisionsPage({
                           detail.linkedTitles,
                           locale,
                           detail.macFormat,
+                          links,
                         )}
                       />
                     </dd>

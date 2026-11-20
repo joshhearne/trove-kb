@@ -11,6 +11,7 @@ import { KbOutline } from "@/components/kb-outline";
 import type { ArticleDetail } from "@/server/services/kb";
 import { originalOf } from "@/server/services/kb-import";
 import { exportOptions, type ExportFormat } from "@/server/kb/export";
+import type { WikilinkIndex } from "@/lib/wikilinks";
 import { formatBytes, formatDateTime } from "@/i18n/format";
 import type { Messages } from "@/i18n";
 import type { Locale } from "@/i18n/locales";
@@ -110,6 +111,7 @@ export function KbArticle({
   originalHref,
   exportHref,
   actions,
+  links,
   locale,
   t,
 }: {
@@ -120,6 +122,8 @@ export function KbArticle({
   /** Where the article is exported from; `?format=` is added. */
   exportHref?: string;
   actions?: React.ReactNode;
+  /** The pages its [[links]] point at, as this reader may open them. */
+  links?: WikilinkIndex;
   locale: Locale;
   t: Messages;
 }) {
@@ -136,18 +140,18 @@ export function KbArticle({
     ? runbook.segments
         .map((segment, index) =>
           segment.kind === "markdown"
-            ? embedVideos(renderArticleMarkdown(index === 0 ? withoutLeadingTitle(segment.text, article.title) : segment.text))
+            ? embedVideos(renderArticleMarkdown(index === 0 ? withoutLeadingTitle(segment.text, article.title) : segment.text, links))
             : MARK,
         )
         .join("")
     : markdown
-      ? embedVideos(renderArticleMarkdown(withoutLeadingTitle(article.body, article.title)))
+      ? embedVideos(renderArticleMarkdown(withoutLeadingTitle(article.body, article.title), links))
       : null;
   const drawn = source !== null ? outlineHtml(source) : null;
   const rendered = (step: RunbookStep): RenderedStep => ({
     id: step.id,
-    html: renderMarkdown(step.text).replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1"),
-    noteHtml: step.note ? embedVideos(renderArticleMarkdown(step.note)) : null,
+    html: renderMarkdown(step.text, links).replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1"),
+    noteHtml: step.note ? embedVideos(renderArticleMarkdown(step.note, links)) : null,
     canned: step.canned ?? null,
   });
   const pieces =

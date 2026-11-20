@@ -58,6 +58,8 @@ export default async function EditDocumentPage({
 
       <DocumentEditor
         documentId={detail.document.id}
+        companyId={detail.document.companyId}
+        locationId={detail.document.locationId ?? null}
         docTypeId={detail.docType.id}
         docTypeName={detail.docType.name}
         initialTitle={detail.document.title}

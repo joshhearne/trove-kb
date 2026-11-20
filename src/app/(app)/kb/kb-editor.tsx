@@ -10,6 +10,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MarkdownWorkspace } from "@/components/markdown/markdown-workspace";
+import { WikilinkProvider } from "@/components/markdown/wikilink-context";
 import { FormError } from "@/components/ui/alert";
 import { useLocale, useMessages } from "@/i18n/client";
 import { formatBytes } from "@/i18n/format";
@@ -143,6 +144,7 @@ export function KbEditor({
   textOnly = false,
   header,
   maxUploadMb,
+  collectionPublic = false,
 }: {
   values: EditorValues;
   backHref: string;
@@ -161,6 +163,8 @@ export function KbEditor({
   header?: ReactNode;
   /** Offers uploading a document instead of writing, for a new article. */
   maxUploadMb?: number;
+  /** The collection is on the public site, so links are checked against what visitors can open. */
+  collectionPublic?: boolean;
 }) {
   const messages = useMessages();
   const locale = useLocale();
@@ -176,6 +180,7 @@ export function KbEditor({
   const ids = { title: useId(), category: useId(), subcategory: useId(), body: useId(), collection: useId() };
   const [body, setBody] = useState(values.body);
   const [runbook, setRunbook] = useState(values.kind === "runbook");
+  const [internalOnly, setInternalOnly] = useState(values.internalOnly);
   const [category, setCategory] = useState(values.category);
   const [subcategory, setSubcategory] = useState(values.subcategory);
   const [categories, setCategories] = useState(initialCategories);
@@ -294,7 +299,18 @@ export function KbEditor({
     </Button>
   ) : null;
 
+  const links = useMemo(
+    () => ({
+      kind: "article" as const,
+      collectionId,
+      articleId: values.articleId ?? null,
+      publicSite: collectionPublic && !internalOnly,
+    }),
+    [collectionId, values.articleId, collectionPublic, internalOnly],
+  );
+
   const form = (
+    <WikilinkProvider value={links}>
     <form
       action={uploadMode ? undefined : formAction}
       onSubmit={uploadMode ? (event) => void upload(event) : undefined}
@@ -396,7 +412,8 @@ export function KbEditor({
         <input
           type="checkbox"
           name="internalOnly"
-          defaultChecked={values.internalOnly}
+          checked={internalOnly}
+          onChange={(event) => setInternalOnly(event.target.checked)}
           className="mt-0.5 size-4 accent-[var(--primary)]"
         />
         <span>
@@ -523,6 +540,7 @@ export function KbEditor({
         </div>
       </dialog>
     </form>
+    </WikilinkProvider>
   );
 
   if (!header) return form;

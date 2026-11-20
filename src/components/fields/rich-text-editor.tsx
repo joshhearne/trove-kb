@@ -5,8 +5,13 @@ import StarterKit from "@tiptap/starter-kit";
 import { TableKit } from "@tiptap/extension-table";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "tiptap-markdown";
-import { IndentDecrease, IndentIncrease } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { IndentDecrease, IndentIncrease, SquareArrowOutUpRight } from "lucide-react";
 import { MarkdownWorkspace } from "@/components/markdown/markdown-workspace";
+import { WikilinkPicker } from "@/components/markdown/wikilink-picker";
+import { useWikilinkContext } from "@/components/markdown/wikilink-context";
+import { WikilinkNode } from "@/components/fields/wikilink-node";
+import type { WikilinkSuggestion } from "@/server/services/wikilinks";
 import { cn } from "@/lib/utils";
 import { useMessages } from "@/i18n/client";
 import type { Messages } from "@/i18n/en-US";
@@ -95,6 +100,15 @@ export function RichTextEditor({
 }) {
   const t = useMessages();
   const labels = t.documents.richText;
+  // Links to other pages, in a markdown field on a page that has a place to link from.
+  const links = useWikilinkContext();
+  const linking = mode === "markdown" && links !== null;
+  const [picking, setPicking] = useState(false);
+  // The editor's input handler is made once; it reads whether links apply from here.
+  const linkingRef = useRef(linking);
+  useEffect(() => {
+    linkingRef.current = linking;
+  }, [linking]);
 
   const editor = useEditor({
     // Rendering on the server would not match the client's ProseMirror output.
@@ -104,6 +118,8 @@ export function RichTextEditor({
       TaskList,
       TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),
+      // Keeps [[doc:…|…]] links whole in the visual view, and writes them back as written.
+      ...(mode === "markdown" ? [WikilinkNode] : []),
       Markdown.configure({
         html: mode === "richtext",
         transformPastedText: true,
@@ -116,6 +132,14 @@ export function RichTextEditor({
       attributes: {
         class: "prose-editor min-h-40 w-full px-3 py-2 outline-none",
         ...(ariaLabelledBy ? { "aria-labelledby": ariaLabelledBy } : {}),
+      },
+      // A second [ opens the list of pages to link, as it does in the source.
+      handleTextInput: (view, from, to, text) => {
+        if (!linkingRef.current || text !== "[" || from < 1) return false;
+        if (view.state.doc.textBetween(from - 1, from) !== "[") return false;
+        view.dispatch(view.state.tr.delete(from - 1, to));
+        setPicking(true);
+        return true;
       },
     },
     onUpdate: ({ editor: instance }) => {
@@ -142,6 +166,19 @@ export function RichTextEditor({
       inList: instance ? instance.isActive("listItem") || instance.isActive("taskItem") : false,
     }),
   });
+
+  /** Puts the picked page in at the cursor, labelled with the selected text or its title. */
+  function insertPage(page: WikilinkSuggestion) {
+    setPicking(false);
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selected = editor.state.doc.textBetween(from, to, " ").trim();
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: "wikilink", attrs: { kind: page.kind, id: page.id, label: selected || page.title } })
+      .run();
+  }
 
   const toolbar = (
     <>
@@ -180,6 +217,20 @@ export function RichTextEditor({
           );
         })}
       </span>
+      {linking && (
+        <button
+          type="button"
+          title={`${t.markdownEditor.links.button} (${t.markdownEditor.links.hint})`}
+          aria-label={t.markdownEditor.links.button}
+          aria-expanded={picking}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setPicking((open) => !open)}
+          className="inline-flex items-center gap-1 rounded border-l px-2 py-1 text-xs hover:bg-[var(--muted)]"
+        >
+          <SquareArrowOutUpRight className="size-3.5" aria-hidden />
+          [[ ]]
+        </button>
+      )}
       {active?.inTable && (
         <span className="flex flex-wrap items-center gap-1 border-l pl-1" role="group" aria-label={labels.table}>
           {TABLE_TOOLS.map((tool) => (
@@ -206,7 +257,22 @@ export function RichTextEditor({
           value={value}
           onChange={onChange}
           flavor="field"
-          visual={<EditorContent editor={editor} />}
+          visual={
+            <div className="relative">
+              <EditorContent editor={editor} />
+              {picking && links && (
+                <WikilinkPicker
+                  context={links}
+                  onPick={insertPage}
+                  onClose={() => {
+                    setPicking(false);
+                    editor?.commands.focus();
+                  }}
+                  className="absolute top-1 right-2"
+                />
+              )}
+            </div>
+          }
           visualToolbar={toolbar}
           // The source may have changed; the visual view starts from it again.
           // tiptap-markdown's setContent takes Markdown, so the source goes in as is.

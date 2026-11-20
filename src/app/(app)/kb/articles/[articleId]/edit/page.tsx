@@ -50,6 +50,7 @@ export default async function EditArticlePage({
         collectionName={article.collectionName}
         canMove={canMove}
         textOnly={importedText}
+        collectionPublic={article.collectionPublic}
         moveUnlocked={canMove && unlock === "move" && hasRecentMfa(user)}
         values={{
           articleId: article.id,

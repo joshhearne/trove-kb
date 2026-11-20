@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { resolveWikilinks } from "@/server/services/wikilinks";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { Pencil, Wrench } from "lucide-react";
@@ -102,6 +103,7 @@ export default async function ArticlePage({
   return (
     <div className="flex flex-col gap-8">
     <KbArticle
+      links={await resolveWikilinks([found.body], { scope, kb: { scope, via: "app", userId: user.id } })}
       article={article}
       backHref={`/kb/${article.collectionId}`}
       originalHref={`/api/kb/articles/${article.id}/original`}

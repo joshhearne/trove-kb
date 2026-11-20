@@ -390,3 +390,23 @@
 @media (prefers-reduced-motion: no-preference) {
   .kb-attention { animation: kb-attention 1.6s ease-out 3; }
 }
+
+/* Links to other pages ([[…]], src/lib/wikilinks.ts). In the visual editor a
+   link is one piece; on a page, one the reader cannot open is its name alone,
+   and one that names no page yet is marked as still to be made. */
+.ProseMirror span.wikilink {
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--primary);
+  white-space: nowrap;
+}
+.ProseMirror span.wikilink::before { content: "[["; opacity: 0.45; }
+.ProseMirror span.wikilink::after { content: "]]"; opacity: 0.45; }
+.ProseMirror span.wikilink.ProseMirror-selectednode { outline: 2px solid var(--ring); }
+.wikilink-missing { color: var(--muted-foreground); }
+.wikilink-unmade {
+  color: var(--muted-foreground);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}

@@ -1,4 +1,6 @@
 import "server-only";
+import { wikilinkLabels, wikilinksToMarkdown } from "@/lib/wikilinks";
+import { resolveWikilinks } from "@/server/services/wikilinks";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db";
 import { kbImages } from "@/server/db/schema";
@@ -102,11 +104,19 @@ export async function exportArticle(
     return { body: new Uint8Array(bytes), mime: original.mime, filename: original.name, inline: false };
   }
 
+  // Links to other pages, as this reader may open them: in a file, by full address.
+  const links = await resolveWikilinks([article.body], {
+    scope: reader.scope,
+    kb: reader,
+    publicSite: reader.via === "public",
+    base: reader.via === "public" ? new URL(url).origin : env.APP_URL.replace(/\/+$/, ""),
+  });
+
   if (format === "md") {
     const pictures = await picturesOf(article);
     const body =
       article.format === "markdown"
-        ? rewriteReferences(article.body, article.sourcePath, (path) => {
+        ? rewriteReferences(wikilinksToMarkdown(article.body, links), article.sourcePath, (path) => {
             const id = pictures.get(path);
             return id ? `${imageBase}/${id}` : null;
           })
@@ -151,7 +161,7 @@ export async function exportArticle(
   const pictures = await picturesOf(article);
   const body =
     article.format === "markdown"
-      ? rewriteReferences(withoutLeadingTitle(withoutStepIds(article.body), article.title), article.sourcePath, (path) => {
+      ? rewriteReferences(withoutLeadingTitle(withoutStepIds(wikilinkLabels(article.body, links)), article.title), article.sourcePath, (path) => {
           const id = pictures.get(path);
           return id ? `${IMAGE_SCHEME}${id}` : null;
         })

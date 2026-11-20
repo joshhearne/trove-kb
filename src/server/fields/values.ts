@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { wikilinkLabels } from "@/lib/wikilinks";
 import { sanitizeRichText, htmlToText } from "@/server/fields/sanitize";
 import type { FieldDefinition, FieldType } from "@/server/fields/types";
 import {
@@ -448,6 +449,10 @@ export function flattenForSearch(
     switch (field.fieldType) {
       case "richtext":
         parts.push(htmlToText(String(value)));
+        break;
+      case "markdown":
+        // A link to another page is searched by what it says, not by its id.
+        parts.push(wikilinkLabels(String(value)));
         break;
       case "dropdown":
         parts.push(labelFor(field.optionListId, value));

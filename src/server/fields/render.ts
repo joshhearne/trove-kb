@@ -2,6 +2,7 @@ import "server-only";
 import { marked } from "marked";
 import { sanitizeRichText } from "@/server/fields/sanitize";
 import { normalizeOutlines, withListTypes } from "@/server/kb/outline-lists";
+import { applyWikilinks, type WikilinkIndex } from "@/lib/wikilinks";
 import type { FieldDefinition } from "@/server/fields/types";
 import { formatCount, formatDate, formatNumber } from "@/i18n/format";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
@@ -21,9 +22,13 @@ import { effectiveMacFormat } from "@/server/fields/values";
 
 marked.setOptions({ gfm: true, breaks: false });
 
-/** Markdown source to safe HTML. Rendered output goes through the same allowlist. */
-export function renderMarkdown(source: string): string {
-  return sanitizeRichText(marked.parse(source, { async: false }));
+/**
+ * Markdown source to safe HTML. Rendered output goes through the same
+ * allowlist. Links to other pages ([[doc:…|…]]) are links where `links` says
+ * the reader may open the page, and their label alone otherwise.
+ */
+export function renderMarkdown(source: string, links?: WikilinkIndex): string {
+  return sanitizeRichText(marked.parse(applyWikilinks(source, links), { async: false }));
 }
 
 /**
@@ -31,8 +36,10 @@ export function renderMarkdown(source: string): string {
  * (a. b. c. under a step, i. ii. under those, indented any amount) become
  * nested lists numbered the way they were written.
  */
-export function renderArticleMarkdown(source: string): string {
-  return sanitizeRichText(withListTypes(marked.parse(normalizeOutlines(source), { async: false })));
+export function renderArticleMarkdown(source: string, links?: WikilinkIndex): string {
+  return sanitizeRichText(
+    withListTypes(marked.parse(normalizeOutlines(applyWikilinks(source, links)), { async: false })),
+  );
 }
 
 export { formatDate, formatDateTime } from "@/i18n/format";
@@ -114,12 +121,14 @@ export function renderFieldValue(
   locale: Locale = DEFAULT_LOCALE,
   /** The instance's MAC format, which mac fields without their own follow. */
   macFormat?: MacFormat,
+  /** The pages markdown fields link to, as the reader may open them. */
+  links?: WikilinkIndex,
 ): RenderedValue {
   if (value === null || value === undefined || value === "") return { kind: "empty" };
 
   switch (field.fieldType) {
     case "markdown":
-      return { kind: "html", html: renderMarkdown(String(value)) };
+      return { kind: "html", html: renderMarkdown(String(value), links) };
 
     case "richtext":
       // Stored sanitized; sanitized again here so older rows cannot bite us.

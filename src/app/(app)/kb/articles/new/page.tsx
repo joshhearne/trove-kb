@@ -30,6 +30,7 @@ export default async function NewArticlePage({
           </>
         }
         maxUploadMb={Math.floor(MAX_ENTRY_BYTES / (1024 * 1024))}
+        collectionPublic={collection.publicAccess}
         backHref={`/kb/${collection.id}`}
         categories={categories.map((row) => ({ category: row.category, subcategory: row.subcategory }))}
         collections={[]}

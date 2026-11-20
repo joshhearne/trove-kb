@@ -516,6 +516,21 @@ appears in the documentation search.
   (1024px and up) the preview beside the text, with a draggable divider. Each
   person picks how editors open (`users.editor_view`: visual, markdown, split)
   in their menu.
+- **Links between pages** (`src/lib/wikilinks.ts`, `src/server/services/wikilinks.ts`):
+  `[[doc:<id>|Label]]` and `[[kb:<id>|Label]]`, the id first so a link survives
+  a rename or a move. Typing `[[` in a Markdown editor offers pages the author
+  may open (documents of their companies, articles of their collections) and
+  "Create …", which makes a Markdown-only document in the same company or an
+  article in the same collection, saved like any page. Every page resolves its
+  links for the person reading it: a page they cannot open is drawn as its
+  label alone, never a link and never its current title (out of scope is not
+  found). The author is warned, in the list and under the preview, when some
+  readers could not follow a link: another company's document, a document from
+  a knowledge base article, an article kept to fewer companies, or one off the
+  public site. A document's `[[doc:…]]` links are written to `document_links`,
+  so they show as backlinks; exports write them as ordinary links, or the label
+  where the reader could not open the page. The visual editor keeps a link as
+  one piece (`WikilinkNode`) and writes it back as it was.
 - **Outlines** written by hand (`a.` `b.` under a step, `i.` `ii.` under those,
   indented any amount) are rewritten as nested Markdown lists when an article
   is drawn or exported, and numbered as written (`src/server/kb/outline-lists.ts`,

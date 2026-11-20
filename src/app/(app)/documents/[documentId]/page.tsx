@@ -13,6 +13,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { renderFieldValue } from "@/server/fields/render";
 import { formatDateTime } from "@/i18n/format";
 import { getI18n } from "@/i18n/server";
+import { resolveWikilinks } from "@/server/services/wikilinks";
 import { formatBytes, listAttachments } from "@/server/services/attachments";
 import { getDomainCheckState } from "@/server/services/domain-checks";
 import { DomainPanel } from "../domain-panel";
@@ -100,6 +101,13 @@ export default async function DocumentPage({
 
   const editor = canEditDocuments(user.role);
   const { locale, messages: t } = await getI18n();
+  // Links to other pages in markdown fields, as this reader may open them.
+  const links = await resolveWikilinks(
+    detail.fields
+      .filter((field) => field.fieldType === "markdown")
+      .map((field) => String(detail.document.fieldValues?.[field.id] ?? "")),
+    { scope, kb: { scope, via: "app", userId: user.id } },
+  );
 
   const branding = await getCompanyBranding(company.id, scope);
   const domainState = await getDomainCheckState(documentId, scope);
@@ -216,6 +224,7 @@ export default async function DocumentPage({
                     detail.linkedTitles,
                     locale,
                     detail.macFormat,
+                    links,
                   );
 
                   if (rendered.kind !== "secret")
