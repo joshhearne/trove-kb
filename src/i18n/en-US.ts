@@ -748,6 +748,7 @@ export const enUS = {
       createHint: "Makes an empty page with that title and links to it.",
       createDocument: "A Markdown document in this company",
       createArticle: "An article in this collection",
+      runbook: "Runbook",
       flaggedTitle: "Some readers of this page may not be able to open these links",
       flags: {
         otherCompany: "It belongs to another company, so people who can open this document may not be able to open it.",
@@ -938,10 +939,22 @@ export const enUS = {
       "Tick steps as you go. Nothing is saved here; a ticketing system that links this runbook keeps its own progress.",
     runbookCanned: (name: string) => `Reply template: ${name}`,
     runbookDone: (done: number, total: number) => `${done} of ${total} done`,
+    nested: {
+      expanded: (steps: number) => `A runbook of its own: ${steps} ${steps === 1 ? "step" : "steps"}, ticked one by one or all at once.`,
+      unavailable: () => "A runbook you can't open, so its steps aren't shown. Tick this step when it's done.",
+      loop: () => "This runbook leads back to one it is already inside, so it isn't opened again here.",
+      "too-deep": () => "Runbooks sit too deep inside one another here to open this one. Open it on its own page.",
+    },
     openPdf: "Open the PDF",
     pdfHint:
       "Text doesn't read right? Open the PDF to see it as written, or download it.",
     downloadOriginal: "Download the original",
+    backlinks: {
+      title: "Linked from",
+      article: (collection: string) => `Knowledge base · ${collection}`,
+      runbook: (collection: string) => `Runbook · ${collection}`,
+      document: (company: string) => `Document · ${company}`,
+    },
     export: {
       button: "Export",
       menu: "Export this article",

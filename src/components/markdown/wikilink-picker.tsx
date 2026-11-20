@@ -145,7 +145,10 @@ export const WikilinkPicker = forwardRef<
           <Icon className="mt-0.5 size-4 shrink-0 text-[var(--muted-foreground)]" aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block break-words">{item.page.title}</span>
-            <span className="block text-xs text-[var(--muted-foreground)]">{item.page.where}</span>
+            <span className="block text-xs text-[var(--muted-foreground)]">
+              {item.page.runbook ? `${t.runbook} · ` : ""}
+              {item.page.where}
+            </span>
           </span>
           {item.page.flags.length > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-800 dark:text-amber-300">

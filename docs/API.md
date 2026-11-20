@@ -208,6 +208,30 @@ its own side; Trove KB stores none. `note` is whatever was nested under the item
 Markdown; `canned` is the name in the first `@canned:[Name]` token of the step.
 Two steps with one id are refused.
 
+A step that is nothing but a link to another runbook, `3. [[kb:<id>|Create the AD
+account]]`, stands for that runbook's steps. `GET /kb/articles/:id` and
+`get_kb_article` add `expanded_steps`, the runbook as one list in reading order with
+each such step followed by the steps it opens into, as deep as five runbooks:
+
+```
+{ id: "account/groups",        // the path of step ids from the top: unique, key progress on it
+  step_id: "groups",           // the step's own id in its runbook
+  runbook_id: "<uuid>",        // the runbook the step is written in
+  parent_id: "account",        // the step it sits under, or null
+  depth: 1,
+  group: false,                // true for a step that opened into others: done when they all are
+  text: "Add groups", note?: "…", canned?: "…",
+  includes?: { id, title, status } }   // on a step that links to a runbook
+```
+
+`status` is `expanded`, or why the runbook did not open: `unavailable` (the key may not
+read it, or it is not a runbook), `loop` (it leads back to a runbook it sits in), or
+`too-deep`. Such a step is an ordinary step to tick. The runbooks are read live, so
+`expanded_steps` follows them as they change; `steps` stays the article's own.
+Anywhere an article's body or steps are returned to a reader, `[[doc:…]]` and
+`[[kb:…]]` links are written as ordinary Markdown links where the key may open the
+page, and as their label where it may not.
+
 ## Knowledge base import (administrators, session-authenticated)
 Used by Admin → Knowledge base. Not part of `/api/v1` and not reachable with an
 API key.

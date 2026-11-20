@@ -4,6 +4,7 @@ import { ChevronDown, ChevronLeft, Download, ExternalLink, FileText, ListChecks 
 import { Chip } from "@/components/ui/chip";
 import { RunbookRun, RunbookSteps, type RenderedStep } from "@/components/kb-runbook-steps";
 import { deriveRunbook, type RunbookStep } from "@/server/kb/runbook";
+import { leafSteps, type NestedStep } from "@/server/kb/runbook-nest";
 import { renderArticleMarkdown, renderMarkdown } from "@/server/fields/render";
 import { outlineHtml } from "@/server/kb/outline";
 import { embedVideos } from "@/server/kb/video";
@@ -12,6 +13,7 @@ import type { ArticleDetail } from "@/server/services/kb";
 import { originalOf } from "@/server/services/kb-import";
 import { exportOptions, type ExportFormat } from "@/server/kb/export";
 import type { WikilinkIndex } from "@/lib/wikilinks";
+import type { PageBacklinks } from "@/server/services/kb-links";
 import { formatBytes, formatDateTime } from "@/i18n/format";
 import type { Messages } from "@/i18n";
 import type { Locale } from "@/i18n/locales";
@@ -29,6 +31,10 @@ function attachments(value: unknown): Attachment[] {
     }
     return [];
   });
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**
@@ -112,6 +118,9 @@ export function KbArticle({
   exportHref,
   actions,
   links,
+  backlinks,
+  articleBase = "/kb/articles",
+  nested,
   locale,
   t,
 }: {
@@ -124,6 +133,12 @@ export function KbArticle({
   actions?: React.ReactNode;
   /** The pages its [[links]] point at, as this reader may open them. */
   links?: WikilinkIndex;
+  /** The pages linking to it that this reader may open. */
+  backlinks?: PageBacklinks;
+  /** Where an article is opened on this site: the app, or the public site. */
+  articleBase?: string;
+  /** A runbook's steps with each link to another runbook opened into its steps. */
+  nested?: NestedStep[];
   locale: Locale;
   t: Messages;
 }) {
@@ -148,12 +163,34 @@ export function KbArticle({
       ? embedVideos(renderArticleMarkdown(withoutLeadingTitle(article.body, article.title), links))
       : null;
   const drawn = source !== null ? outlineHtml(source) : null;
-  const rendered = (step: RunbookStep): RenderedStep => ({
+  // A step that is only a link to another runbook opens into that runbook's steps.
+  const nestedById = new Map((nested ?? []).map((node) => [node.id, node]));
+  const renderNested = (node: NestedStep): RenderedStep => ({
+    id: node.path,
+    // A runbook the reader may not read is named, never linked.
+    html: node.runbook
+      ? node.runbook.status === "unavailable"
+        ? escapeHtml(node.text)
+        : `<a href="${articleBase}/${node.runbook.id}">${escapeHtml(node.text)}</a>`
+      : renderMarkdown(node.text, links).replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1"),
+    noteHtml: node.note ? embedVideos(renderArticleMarkdown(node.note, links)) : null,
+    canned: node.canned ?? null,
+    runbook: node.runbook ? { status: node.runbook.status } : null,
+    children: node.children.map(renderNested),
+  });
+  const renderPlain = (step: RunbookStep): RenderedStep => ({
     id: step.id,
     html: renderMarkdown(step.text, links).replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1"),
     noteHtml: step.note ? embedVideos(renderArticleMarkdown(step.note, links)) : null,
     canned: step.canned ?? null,
+    runbook: null,
+    children: [],
   });
+  const rendered = (step: RunbookStep): RenderedStep => {
+    const node = nestedById.get(step.id);
+    if (node?.runbook) return renderNested(node);
+    return renderPlain(step);
+  };
   const pieces =
     runbook && drawn
       ? (() => {
@@ -257,7 +294,7 @@ export function KbArticle({
             {t.kb.unextractedBody}
           </p>
         ) : pieces ? (
-          <RunbookRun total={runbook?.steps.length ?? 0}>
+          <RunbookRun total={nested ? leafSteps(nested).length : (runbook?.steps.length ?? 0)}>
             {pieces.map((piece, index) =>
               piece.kind === "html" ? (
                 piece.html.trim() === "" ? null : (
@@ -268,7 +305,7 @@ export function KbArticle({
                   />
                 )
               ) : (
-                <RunbookSteps key={index} steps={piece.steps} first={piece.from} />
+                <RunbookSteps key={index} steps={piece.steps} first={piece.from} last={!pieces.slice(index + 1).some((later) => later.kind === "steps")} />
               ),
             )}
           </RunbookRun>
@@ -279,6 +316,34 @@ export function KbArticle({
           />
         ) : (
           <pre className="min-w-0 font-sans text-sm break-words whitespace-pre-wrap">{article.body}</pre>
+        )}
+
+        {backlinks && backlinks.documents.length + backlinks.articles.length > 0 && (
+          <section aria-labelledby="kb-backlinks" className="flex flex-col gap-2 border-t pt-4">
+            <h2 id="kb-backlinks" className="text-sm font-semibold">
+              {t.kb.backlinks.title}
+            </h2>
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {backlinks.articles.map((entry) => (
+                <li key={`kb-${entry.id}`} className="flex flex-wrap items-baseline gap-x-2">
+                  <Link href={`${articleBase}/${entry.id}` as Route} className="font-medium hover:underline">
+                    {entry.title}
+                  </Link>
+                  <span className="text-xs text-[var(--muted-foreground)]">
+                    {entry.kind === "runbook" ? t.kb.backlinks.runbook(entry.collectionName) : t.kb.backlinks.article(entry.collectionName)}
+                  </span>
+                </li>
+              ))}
+              {backlinks.documents.map((entry) => (
+                <li key={`doc-${entry.id}`} className="flex flex-wrap items-baseline gap-x-2">
+                  <Link href={`/documents/${entry.id}` as Route} className="font-medium hover:underline">
+                    {entry.title}
+                  </Link>
+                  <span className="text-xs text-[var(--muted-foreground)]">{t.kb.backlinks.document(entry.companyName)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </article>
       {drawn && drawn.outline.length > 0 && <KbOutline items={drawn.outline} />}

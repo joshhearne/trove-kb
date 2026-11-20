@@ -548,6 +548,32 @@ export const documentLinks = pgTable(
   (t) => [primaryKey({ columns: [t.fromDoc, t.toDoc, t.fieldId] })],
 );
 
+/**
+ * Links written as [[…]] (src/lib/wikilinks.ts) where a knowledge base article
+ * is at either end: article to article, article to document, document to
+ * article. Document to document lives in document_links. Neither end is a
+ * foreign key, since an end may be either kind; a link to a page since
+ * removed or archived is left out where links are read. Rewritten from the
+ * text on every save of the page they are written in.
+ */
+export const kbLinks = pgTable(
+  "kb_links",
+  {
+    fromKind: text("from_kind").notNull(),
+    fromId: uuid("from_id").notNull(),
+    toKind: text("to_kind").notNull(),
+    toId: uuid("to_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.fromKind, t.fromId, t.toKind, t.toId] }),
+    index("kb_links_to_idx").on(t.toKind, t.toId),
+    check(
+      "kb_links_kinds_check",
+      sql`${t.fromKind} IN ('kb','doc') AND ${t.toKind} IN ('kb','doc') AND NOT (${t.fromKind} = 'doc' AND ${t.toKind} = 'doc')`,
+    ),
+  ],
+);
+
 export const attachments = pgTable("attachments", {
   id: uuid("id").primaryKey().defaultRandom(),
   documentId: uuid("document_id")

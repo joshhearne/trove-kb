@@ -150,6 +150,20 @@ CREATE TABLE document_links (               -- derived from doc_link fields, for
   PRIMARY KEY (from_doc, to_doc, field_id)
 );
 
+-- [[…]] links with a knowledge base article at either end (article to article,
+-- article to document, document to article), for backlinks. Document to
+-- document lives in document_links. No foreign keys: an end may be either kind,
+-- and a link to a page since removed is left out where links are read.
+CREATE TABLE kb_links (
+  from_kind text NOT NULL,
+  from_id   uuid NOT NULL,
+  to_kind   text NOT NULL,
+  to_id     uuid NOT NULL,
+  PRIMARY KEY (from_kind, from_id, to_kind, to_id),
+  CONSTRAINT kb_links_kinds_check CHECK (from_kind IN ('kb','doc') AND to_kind IN ('kb','doc') AND NOT (from_kind = 'doc' AND to_kind = 'doc'))
+);
+CREATE INDEX kb_links_to_idx ON kb_links (to_kind, to_id);
+
 CREATE TABLE attachments (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,

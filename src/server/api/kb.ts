@@ -7,6 +7,12 @@ import { publicAddressFor } from "@/server/kb/share";
 import { readerKey } from "@/server/kb/identity";
 import { readerReaction, reactionCounts, type FavoriteRow } from "@/server/services/kb-reactions";
 import { ARTICLE_KINDS } from "@/server/kb/extract";
+import { env } from "@/lib/env";
+import { wikilinksToMarkdown, type WikilinkIndex } from "@/lib/wikilinks";
+import { resolveWikilinks } from "@/server/services/wikilinks";
+import { expandRunbook, nestedTexts } from "@/server/services/kb-runbooks";
+import { flattenNested, isGroup, type NestedStep } from "@/server/kb/runbook-nest";
+import type { RunbookStep } from "@/server/kb/runbook";
 
 /**
  * The knowledge base over REST: the same reads MCP offers and the same
@@ -136,13 +142,60 @@ export async function serializeReactions(articleId: string, readerKey: string | 
   };
 }
 
-export async function serializeArticle(article: ArticleDetail, readerKey: string | null = null) {
+/** A step's text and note with [[links]] as ordinary Markdown links the key can open, or their labels. */
+function withLinks<T extends Pick<RunbookStep, "text" | "note">>(step: T, links: WikilinkIndex): T {
+  return {
+    ...step,
+    text: wikilinksToMarkdown(step.text, links),
+    ...(step.note !== undefined ? { note: wikilinksToMarkdown(step.note, links) } : {}),
+  };
+}
+
+/**
+ * A runbook as one list in reading order, each step that is only a link to
+ * another runbook followed by that runbook's steps: `id` is the step's path
+ * (`step/step`), unique across the list, for keying progress; `group` steps
+ * are done when every step under them is.
+ */
+export function serializeExpandedSteps(nested: readonly NestedStep[], links: WikilinkIndex) {
+  return flattenNested(nested).map((step) => ({
+    id: step.path,
+    step_id: step.id,
+    runbook_id: step.articleId,
+    parent_id: step.parent,
+    depth: step.depth,
+    group: isGroup(step),
+    text: step.runbook ? step.text : wikilinksToMarkdown(step.text, links),
+    ...(step.note !== undefined ? { note: wikilinksToMarkdown(step.note, links) } : {}),
+    ...(step.canned ? { canned: step.canned } : {}),
+    ...(step.runbook ? { includes: { id: step.runbook.id, title: step.runbook.title, status: step.runbook.status } } : {}),
+  }));
+}
+
+export async function serializeArticle(article: ArticleDetail, readerKey: string | null = null, reader?: KbReader) {
+  // Read as the key reads: linked runbooks it may read open into their steps,
+  // and a [[link]] is a link where it may open the page, its label elsewhere.
+  const nested = reader && article.kind === "runbook" ? await expandRunbook(article, reader) : [];
+  const links = reader
+    ? await resolveWikilinks([article.body, ...nestedTexts(nested)], {
+        scope: reader.scope,
+        kb: reader,
+        publicSite: reader.audience === "public",
+        base: env.APP_URL.replace(/\/+$/, ""),
+      })
+    : new Map();
   return {
     ...serializeArticleSummary(article, { id: article.collectionId, name: article.collectionName }),
     ...(await mineFor(readerKey, article.id)),
-    body: article.body,
+    // Echoed to the key that wrote it, the body is as written; read, its links are links.
+    body: reader ? wikilinksToMarkdown(article.body, links) : article.body,
     format: article.format,
-    ...(article.kind === "runbook" ? { steps: article.steps } : {}),
+    ...(article.kind === "runbook"
+      ? {
+          steps: reader ? article.steps.map((step) => withLinks(step, links)) : article.steps,
+          ...(reader ? { expanded_steps: serializeExpandedSteps(nested, links) } : {}),
+        }
+      : {}),
     internal_only: article.publicHidden,
     public_url: await publicAddressFor(article),
     attachments: {

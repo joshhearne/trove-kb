@@ -1,4 +1,8 @@
 import "server-only";
+import { env } from "@/lib/env";
+import { serializeExpandedSteps } from "@/server/api/kb";
+import { resolveWikilinks } from "@/server/services/wikilinks";
+import { expandRunbook, nestedTexts } from "@/server/services/kb-runbooks";
 import { z } from "zod";
 import { serializeCompany, serializeDocument } from "@/server/api/serializers";
 import { getCompany, listCompaniesPage } from "@/server/services/companies";
@@ -451,7 +455,8 @@ export const TOOLS: ToolDefinition[] = [
       "One knowledge base article with its metadata and source_url. A long article " +
       "comes a part at a time: when next_chunk is not null, call again with " +
       "start_chunk set to it. To read around a search result, pass its matched chunk " +
-      "as start_chunk.",
+      "as start_chunk. A runbook carries steps, and expanded_steps: each step that is only " +
+      "a link to another runbook followed by that runbook's steps, keyed by path.",
     inputSchema: {
       type: "object",
       properties: {
@@ -479,11 +484,20 @@ export const TOOLS: ToolDefinition[] = [
       const total = part?.total ?? 0;
       const last = chunks[chunks.length - 1]?.ordinal ?? parsed.data.start_chunk;
 
+      // A runbook's links to other runbooks, opened into their steps as this caller may read them.
+      const nested = article.kind === "runbook" ? await expandRunbook(article, reader) : [];
+      const links =
+        article.kind === "runbook"
+          ? await resolveWikilinks(nestedTexts(nested), { scope: reader.scope, kb: reader, base: env.APP_URL.replace(/\/+$/, "") })
+          : new Map();
+
       return toolResult({
         article_id: article.id,
         title: article.title,
         kind: article.kind,
-        ...(article.kind === "runbook" ? { steps: article.steps } : {}),
+        ...(article.kind === "runbook"
+          ? { steps: article.steps, expanded_steps: serializeExpandedSteps(nested, links) }
+          : {}),
         collection: { id: article.collectionId, name: article.collectionName },
         category: article.category,
         subcategory: article.subcategory,
@@ -616,7 +630,8 @@ export const TOOLS: ToolDefinition[] = [
           description:
             "A runbook is a procedure: the items of the body's first numbered list are its " +
             "steps, each given a stable id on save (or written as `{#id}` at the end of the " +
-            "item) that a system tracking progress keys on. Default article.",
+            "item) that a system tracking progress keys on. A step that is only a link to " +
+            "another runbook, [[kb:<id>|Name]], opens into that runbook's steps. Default article.",
         },
       },
       required: ["collection_id", "external_id", "title", "body"],

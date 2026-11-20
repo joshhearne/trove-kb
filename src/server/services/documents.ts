@@ -1,4 +1,5 @@
 import "server-only";
+import { syncKbLinks } from "@/server/services/kb-links";
 import { wikilinkTargets } from "@/lib/wikilinks";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
@@ -254,6 +255,15 @@ async function syncDocumentLinks(
   }
 
   if (rows.length > 0) await tx.insert(documentLinks).values(rows).onConflictDoNothing();
+
+  // Its [[kb:…]] links to articles, for those articles' backlinks.
+  await syncKbLinks(
+    tx,
+    { kind: "doc", id: documentId },
+    fieldList
+      .filter((field) => field.fieldType === "markdown" && typeof values[field.id] === "string")
+      .map((field) => String(values[field.id])),
+  );
 }
 
 export type Backlink = {
