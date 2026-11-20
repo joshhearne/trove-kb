@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveWikilinks } from "@/server/services/wikilinks";
+import { expandRunbook, nestedTexts } from "@/server/services/kb-runbooks";
+import { listPageBacklinks } from "@/server/services/kb-links";
 import { KbArticle } from "@/components/kb-article";
 import { ReactionBar } from "@/components/kb-reactions";
 import { publicIdentity } from "@/server/kb/identity";
@@ -29,10 +31,15 @@ export default async function PublicArticlePage({
     getI18n(),
   ]);
   const reaction = identity ? await readerReaction(identity.key, article.id) : null;
+  // A runbook's links to other runbooks, opened into their steps as this visitor may read them.
+  const nested = await expandRunbook(found, reader);
 
   return (
     <KbArticle
-      links={await resolveWikilinks([found.body], { scope: reader.scope, kb: reader, publicSite: true })}
+      nested={nested}
+      links={await resolveWikilinks([found.body, ...nestedTexts(nested)], { scope: reader.scope, kb: reader, publicSite: true })}
+      backlinks={await listPageBacklinks({ kind: "kb", id: found.id }, { scope: reader.scope, kb: reader, publicSite: true })}
+      articleBase="/pub/kb/articles"
       article={article}
       backHref={`/pub/kb/${article.collectionId}`}
       originalHref={`/pub/kb/articles/${article.id}/original`}

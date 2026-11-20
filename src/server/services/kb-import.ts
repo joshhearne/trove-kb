@@ -1,4 +1,5 @@
 import "server-only";
+import { syncKbLinks } from "@/server/services/kb-links";
 import { wikilinkLabels } from "@/lib/wikilinks";
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
@@ -283,6 +284,8 @@ export async function storeArticle(
 
     // A rule or a hidden category applies to an article the moment it arrives.
     await applyVisibility(collectionId, row.id, tx);
+    // Its [[links]], for the backlinks of the pages it links to.
+    await syncKbLinks(tx, { kind: "kb", id: row.id }, [body]);
 
     return row.id;
   });

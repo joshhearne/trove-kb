@@ -1,4 +1,5 @@
 import "server-only";
+import { syncKbLinks } from "@/server/services/kb-links";
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
@@ -295,6 +296,7 @@ export async function editTextArticle(
       })
       .where(eq(kbArticles.id, articleId));
     await rewriteChunks(tx, articleId, article.collectionId, title, body, extraction);
+    await syncKbLinks(tx, { kind: "kb", id: articleId }, [body]);
     await applyVisibility(article.collectionId, articleId, tx);
     await holdOut(tx, article.collectionId, article.sourceKey, "edited", articleId, writer);
     await recordRevision("edited", article, revisionActor(writer), {}, tx);
@@ -370,6 +372,7 @@ export async function replaceArticleFile(
       })
       .where(eq(kbArticles.id, articleId));
     await rewriteChunks(tx, articleId, article.collectionId, article.title, body, extracted.extraction);
+    await syncKbLinks(tx, { kind: "kb", id: articleId }, [body]);
     await holdOut(tx, article.collectionId, article.sourceKey, "edited", articleId, writer);
     await recordRevision(
       "replaced",

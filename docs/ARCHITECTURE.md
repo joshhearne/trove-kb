@@ -531,6 +531,18 @@ appears in the documentation search.
   so they show as backlinks; exports write them as ordinary links, or the label
   where the reader could not open the page. The visual editor keeps a link as
   one piece (`WikilinkNode`) and writes it back as it was.
+- **Backlinks for articles** (`kb_links`, `src/server/services/kb-links.ts`):
+  every `[[…]]` link with an article at either end (article to article, article
+  to document, document to article) is rewritten from the text on each save,
+  and listed under "Linked from" on the page linked to: only pages the reader
+  may open, none archived. Document to document stays in `document_links`.
+- **Runbooks inside runbooks** (`src/server/kb/runbook-nest.ts`): a step that is
+  only a link to another runbook opens into that runbook's steps when read,
+  recursively up to five deep, each runbook read by the same reader. A step it
+  brings is keyed by its path (`step/step`), so progress kept elsewhere follows
+  it even when one small runbook appears twice. A runbook the reader cannot
+  read, a loop, or too deep a nesting stays a single step. The API and MCP add
+  `expanded_steps`; `steps` stays the article's own.
 - **Outlines** written by hand (`a.` `b.` under a step, `i.` `ii.` under those,
   indented any amount) are rewritten as nested Markdown lists when an article
   is drawn or exported, and numbered as written (`src/server/kb/outline-lists.ts`,

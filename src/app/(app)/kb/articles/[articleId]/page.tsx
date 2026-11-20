@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { resolveWikilinks } from "@/server/services/wikilinks";
+import { expandRunbook, nestedTexts } from "@/server/services/kb-runbooks";
+import { listPageBacklinks } from "@/server/services/kb-links";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { Pencil, Wrench } from "lucide-react";
@@ -100,10 +102,15 @@ export default async function ArticlePage({
     );
   }
 
+  // A runbook's links to other runbooks, opened into their steps as this reader may read them.
+  const nested = await expandRunbook(found, { scope, via: "app", userId: user.id });
+
   return (
     <div className="flex flex-col gap-8">
     <KbArticle
-      links={await resolveWikilinks([found.body], { scope, kb: { scope, via: "app", userId: user.id } })}
+      nested={nested}
+      links={await resolveWikilinks([found.body, ...nestedTexts(nested)], { scope, kb: { scope, via: "app", userId: user.id } })}
+      backlinks={await listPageBacklinks({ kind: "kb", id: found.id }, { scope, kb: { scope, via: "app", userId: user.id } })}
       article={article}
       backHref={`/kb/${article.collectionId}`}
       originalHref={`/api/kb/articles/${article.id}/original`}

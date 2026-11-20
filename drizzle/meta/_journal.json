@@ -337,6 +337,13 @@
       "when": 1795200525866,
       "tag": "0047_editor_view",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795206673119,
+      "tag": "0048_kb_links",
+      "breakpoints": true
     }
   ]
 }

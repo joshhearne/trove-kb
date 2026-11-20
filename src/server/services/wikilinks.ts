@@ -65,6 +65,8 @@ export type WikilinkSuggestion = {
   /** The company of a document, the collection of an article. */
   where: string;
   flags: WikilinkFlag[];
+  /** An article that is a runbook: a step that is only a link to it opens into its steps. */
+  runbook?: boolean;
 };
 
 /* ---------- Resolving what a reader may open ---------- */
@@ -220,6 +222,7 @@ export async function suggestWikilinks(
       collectionId: kbArticles.collectionId,
       collectionName: kbCollections.name,
       publicHidden: kbArticles.publicHidden,
+      kind: kbArticles.kind,
     })
     .from(kbArticles)
     .innerJoin(kbCollections, eq(kbCollections.id, kbArticles.collectionId))
@@ -251,6 +254,7 @@ export async function suggestWikilinks(
       id: row.id,
       title: row.title,
       where: row.collectionName,
+      runbook: row.kind === "runbook",
       flags: flagsFor(
         context,
         { kind: "kb", collectionId: row.collectionId, publicHidden: row.publicHidden, audience: known.get(row.collectionId) ?? none },

@@ -14,6 +14,7 @@ import { renderFieldValue } from "@/server/fields/render";
 import { formatDateTime } from "@/i18n/format";
 import { getI18n } from "@/i18n/server";
 import { resolveWikilinks } from "@/server/services/wikilinks";
+import { listPageBacklinks } from "@/server/services/kb-links";
 import { formatBytes, listAttachments } from "@/server/services/attachments";
 import { getDomainCheckState } from "@/server/services/domain-checks";
 import { DomainPanel } from "../domain-panel";
@@ -101,6 +102,8 @@ export default async function DocumentPage({
 
   const editor = canEditDocuments(user.role);
   const { locale, messages: t } = await getI18n();
+  // Knowledge base articles linking here, that this reader may read.
+  const kbBacklinks = await listPageBacklinks({ kind: "doc", id: documentId }, { scope, kb: { scope, via: "app", userId: user.id } });
   // Links to other pages in markdown fields, as this reader may open them.
   const links = await resolveWikilinks(
     detail.fields
@@ -369,7 +372,7 @@ export default async function DocumentPage({
         )}
       </section>
 
-      {backlinks.length > 0 && (
+      {(backlinks.length > 0 || kbBacklinks.articles.length > 0) && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold tracking-tight">
             {t.documents.linkedFrom}
@@ -388,6 +391,16 @@ export default async function DocumentPage({
                 </Link>
                 <span className="text-sm text-[var(--muted-foreground)]">
                   {backlink.docTypeName} · {backlink.fieldLabel}
+                </span>
+              </li>
+            ))}
+            {kbBacklinks.articles.map((article) => (
+              <li key={`kb-${article.id}`} className="flex flex-wrap items-center gap-2 rounded-md border px-4 py-3">
+                <Link href={`/kb/articles/${article.id}`} className="font-medium hover:underline">
+                  {article.title}
+                </Link>
+                <span className="text-sm text-[var(--muted-foreground)]">
+                  {t.kb.backlinks.article(article.collectionName)}
                 </span>
               </li>
             ))}

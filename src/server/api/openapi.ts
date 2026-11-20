@@ -355,8 +355,11 @@ export function buildOpenApiDocument(baseUrl: string) {
           summary: "Fetch an article in full",
           description:
             "The Markdown body, `external_id`, `source_url`, `source_type`, `public`, `public_url` (the address " +
-            "on the public site, or null), `favorites` and `helpfulness`. A runbook also carries `steps`. With " +
-            "X-Trove-Reader, `mine` says what that reader made of it.",
+            "on the public site, or null), `favorites` and `helpfulness`. A runbook also carries `steps`, and " +
+            "`expanded_steps`: every step in reading order, a step that is only a link to another runbook " +
+            "followed by that runbook's steps (`id` is the step's path, `step/step`; `group` steps are done when " +
+            "every step under them is). `[[…]]` links to other pages are written as Markdown links the key can " +
+            "open, or as their labels. With X-Trove-Reader, `mine` says what that reader made of it.",
           parameters: [AUDIENCE_PARAM, { ...READER_PARAM, required: false }],
           responses: { "200": ok("The article"), ...ERRORS },
         },
