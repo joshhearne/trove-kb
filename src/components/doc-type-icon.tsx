@@ -1,18 +1,16 @@
 import { createElement } from "react";
 import { FileText, icons, type LucideProps } from "lucide-react";
-import { iconKey } from "@/lib/icon-name";
+import { iconLookup } from "@/lib/icon-name";
 
 type IconComponent = React.ComponentType<LucideProps>;
 
-/** Every icon lucide-react ships, by the key both spellings of its name share. */
-const BY_KEY: ReadonlyMap<string, IconComponent> = new Map(
-  Object.entries(icons).map(([component, Icon]) => [iconKey(component), Icon]),
-);
+/** Every icon lucide-react ships, found by either spelling of its name. */
+const lookup = iconLookup<IconComponent>(Object.entries(icons));
 
 /** The component for a stored icon name, or null when lucide has no such icon. */
 export function resolveIcon(name: string | null | undefined): IconComponent | null {
   if (!name) return null;
-  return BY_KEY.get(iconKey(name)) ?? null;
+  return lookup(name) ?? null;
 }
 
 /**

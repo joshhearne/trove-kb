@@ -37,6 +37,16 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: better-auth
         update-types: ["version-update:semver-major"]
+      # Held until the tooling catches up: eslint 10 breaks eslint-config-next's
+      # bundled eslint-plugin-react, and typescript-eslint refuses TypeScript 7.
+      # Lift each when a Next release supports it.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # unpdf 2 needs Node 24; the images run node:22. Lift with the Node upgrade.
+      - dependency-name: unpdf
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"
 

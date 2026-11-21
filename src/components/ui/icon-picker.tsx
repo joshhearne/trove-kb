@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { icons } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { iconKey, iconStoredName } from "@/lib/icon-name";
+import { iconKey, iconLookup, iconStoredName } from "@/lib/icon-name";
 import { cn } from "@/lib/utils";
 import { useMessages } from "@/i18n/client";
 
@@ -15,12 +15,18 @@ type Entry = {
   Icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 };
 
-/** Every icon lucide-react ships, in the order the lucide site lists them. */
-const ALL: readonly Entry[] = Object.entries(icons)
-  .map(([component, Icon]) => ({ name: iconStoredName(component), key: iconKey(component), Icon }))
-  .sort((a, b) => a.name.localeCompare(b.name, "en-US"));
+/** Every icon lucide-react ships, beside the component name it is exported as. */
+const ENTRIES: readonly [string, Entry][] = Object.entries(icons).map(([component, Icon]) => [
+  component,
+  { name: iconStoredName(component), key: iconKey(component), Icon },
+]);
 
-const BY_KEY = new Map(ALL.map((entry) => [entry.key, entry]));
+/** Every icon, in the order the lucide site lists them. */
+const ALL: readonly Entry[] = ENTRIES.map(([, entry]) => entry).sort((a, b) =>
+  a.name.localeCompare(b.name, "en-US"),
+);
+
+const lookup = iconLookup(ENTRIES);
 
 /** How many icons the grid shows at once; the search narrows the rest. */
 const PAGE = 120;
@@ -47,7 +53,7 @@ export function IconPicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const chosen = value ? BY_KEY.get(iconKey(value)) : undefined;
+  const chosen = value ? lookup(value) : undefined;
 
   const matches = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
