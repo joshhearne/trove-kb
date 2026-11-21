@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { icons } from "lucide-react";
 import { iconNames } from "lucide-react/dynamic";
-import { iconKey, iconStoredName, isIconName } from "./icon-name";
+import { iconKey, iconLookup, iconStoredName, isIconName } from "./icon-name";
 
 describe("icon names", () => {
   it("turns the component name into a stored name", () => {
@@ -19,9 +19,35 @@ describe("icon names", () => {
     expect(iconKey(" Building-2 ")).toBe(iconKey("Building2"));
   });
 
-  it("keys every icon lucide-react ships apart", () => {
+  it("finds every icon lucide-react ships by either spelling of its name", () => {
+    const lookup = iconLookup(Object.entries(icons));
+    for (const [component, Icon] of Object.entries(icons)) {
+      expect(lookup(component)).toBe(Icon);
+      expect(lookup(iconStoredName(component))).toBe(Icon);
+    }
+  });
+
+  it("keeps icons apart whose names differ only by a dash", () => {
+    const lookup = iconLookup([
+      ["LetterS", "letter s"],
+      ["Letters", "letters"],
+      ["GlobeLock", "globe lock"],
+    ]);
+    expect(lookup("letter-s")).toBe("letter s");
+    expect(lookup("LetterS")).toBe("letter s");
+    expect(lookup("letters")).toBe("letters");
+    expect(lookup("Letters")).toBe("letters");
+    // The dash-free fallback still finds a name nobody else shares...
+    expect(lookup("globelock")).toBe("globe lock");
+    expect(lookup(" Globe-Lock ")).toBe("globe lock");
+    // ...and guesses at neither when two names share it.
+    expect(lookup("LETTERS")).toBe("letters");
+    expect(lookup("letter s")).toBeUndefined();
+  });
+
+  it("keys almost every icon lucide-react ships apart", () => {
     const keys = Object.keys(icons).map(iconKey);
-    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.length - new Set(keys).size).toBeLessThan(5);
   });
 
   it("names almost every icon the way the lucide site does", () => {
