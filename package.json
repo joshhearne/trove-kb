@@ -33,7 +33,7 @@
     "@noble/hashes": "^2.4.0",
     "@opennextjs/cloudflare": "^1.20.6",
     "@pdf-lib/fontkit": "^1.1.1",
-    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
     "@tiptap/extension-table": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
