@@ -1,5 +1,6 @@
 # Dependabot version updates. PRs go into dev, like all other work; main is
-# released code only. Minor and patch bumps are grouped into one PR per
+# released code only. GitHub reads this file from the default branch (main),
+# so it takes effect once a release moves main past the commit that adds it. Minor and patch bumps are grouped into one PR per
 # ecosystem; major bumps arrive one per PR so each can be reviewed alone.
 version: 2
 
@@ -14,6 +15,28 @@ updates:
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
+    # Framework majors are planned upgrades, not weekly bumps (as in Resolvd).
+    ignore:
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint-config-next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tailwindcss/postcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tiptap/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: better-auth
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"
 
@@ -29,6 +52,21 @@ updates:
       day: monday
     ignore:
       - dependency-name: node
+        update-types: [version-update:semver-major]
+    commit-message:
+      prefix: "deps(docker)"
+
+  # postgres:16-alpine in docker-compose.yml. A Postgres major needs a dump and
+  # restore, so only minor/patch tags are proposed. The 1Password Connect
+  # images are pinned to :latest and have nothing to bump.
+  - package-ecosystem: docker-compose
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      - dependency-name: postgres
         update-types: [version-update:semver-major]
     commit-message:
       prefix: "deps(docker)"
